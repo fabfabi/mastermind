@@ -80,10 +80,29 @@ function full_list()
 
 end
 
+mutable struct line
+    line :: Matrix{Int8}
+end
+
+
+mutable struct game
+    code :: line
+    results :: Vector{result}
+    memory :: Vector{line}
+    score :: Int = 0
+end
 
 mutable struct asdf
     a::String
-    b::Int
+    
 end
 
-b = asdf("text", 5)
+function controller()
+    show() = 1
+    status() = "zweite funktion"
+    () -> (show; status)
+end
+
+a = controller()
+
+a.show()
