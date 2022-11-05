@@ -1,4 +1,4 @@
-
+import Base.== #for overloading the operator
 
 ############################################################################
 #####################    GLOBAL VARIABLES   ################################
@@ -15,6 +15,12 @@ COLUMNS = 4
 
 random_result() = rand(1 : COLORS, (1,COLUMNS))
 
+mutable struct result
+    correct_pos  :: Int
+    correct_cols :: Int
+end
+# overload the == operator
+Base.:(==)(c::result, d::result) = ((c.correct_pos == d.correct_pos) & (c.correct_cols == d.correct_cols)) 
 
 function grade_result(input, solution)
 
@@ -42,7 +48,8 @@ function grade_result(input, solution)
             sol[j] = 0
         end
     end
-    return correct_positions, correct_colors
+    #return correct_positions, correct_colors
+    return result(correct_positions, correct_colors)
 end
 
 function full_list()
@@ -73,7 +80,6 @@ function full_list()
 
 end
 
-full_list()
 
 mutable struct asdf
     a::String
