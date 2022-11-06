@@ -1,5 +1,6 @@
 import Base.== #for overloading the operator
 using Random
+using CSV
 
 ############################################################################
 #####################    GLOBAL VARIABLES   ################################
@@ -109,7 +110,7 @@ end
 
 CANDIDATES = array_list()
 
-function auto_solver(solution, output_style = "Dict")
+function auto_solver(solution)
     candidates = copy(CANDIDATES)
 
     #candidates = full_list() #does not work with the filter function
@@ -131,20 +132,16 @@ function auto_solver(solution, output_style = "Dict")
         filter!(x -> grade_result(x, selected_row) == result, candidates)
     
     end
-    if output_style == "Matrix"
-        return score
-    else
-        return Dict("choices" => choices,
+    return Dict("choices" => choices,
                 "solution" => solution,
                 "candidate" => selected_row,
                 "results" => results,
                 "score" => size(choices)[1])
-    end
 
 end
 
 
-function flatten_result(result, max_tries=10)
+function result_2_matrix(result, max_tries=10)
 
     max_tries -= 1 #the last one will be popped...
 
@@ -187,7 +184,7 @@ function flatten_result(result, max_tries=10)
     end
     vec = collect(Iterators.flatten(mem)) 
 
-    matrix = zeros(Int8, 1, (max_tries + 1)* COLUMNS + 1)
+    matrix = zeros(Int8, 1, (max_tries)* (COLUMNS + 2) + COLUMNS + 1)
     matrix[1, 1:length(vec)] = vec'
 
     #cols = (COLUMNS + 2) * max_tries + index
@@ -198,4 +195,39 @@ function flatten_result(result, max_tries=10)
     #matrix[1, (max_tries * COLUMNS + 1):end ] = res'
 
     return matrix
+end
+
+function result_generator(fname, multiplicity = 1, max_tries = 7)
+    @time begin
+        open(fname, "w") do file
+
+            for sol in CANDIDATES
+                #find a solution for every individual possibility
+                counter = 0
+                while counter < multiplicity
+                    res = auto_solver(sol)#solve
+                    if res["score"] <= max_tries
+                        flat_res = result_2_matrix(res, max_tries)
+                        write(file, string(flat_res))
+                        write(file, "\n")
+                        counter += 1
+                    end #try again otherwise
+                end
+            end
+
+        end
+    end
+end
+
+function read_results(fname)
+
+    mem = Any[]
+    for line in eachline(fname)
+        line = line[5:end-1] #cut  Int8[ and ]
+        line = filter.(isdigit, collect.(line)) #remove everything that is not a number
+        line = [parse(Int8, c) for c in line ]
+        push!(mem, copy(line'))
+    end
+
+    return mem
 end
