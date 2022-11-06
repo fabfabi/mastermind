@@ -24,18 +24,13 @@ mutable struct RESULT
     pos  :: Int
     cols :: Int
 end
+
+# overload the == operator
 Base.:(==)(c::RESULT, d::RESULT) = ((c.pos == d.pos) & (c.cols == d.cols)) 
 Base.:(!=)(c::RESULT, d::RESULT) = (!(c == d)) 
 Base.:(==)(c::RESULT, d::Bool)   = (d ? c.pos == COLUMNS : c.pos < COLUMNS) #the correct result is true
 Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
-
-mutable struct round
-    input :: LINE
-    result :: RESULT
-end
-
-# overload the == operator
 
 function grade_result(input, solution)
 
@@ -150,6 +145,7 @@ end
 
 
 function flatten_result(result, max_tries=10)
+    
     inputs = result["choices"]
     results = result["results"]
 
@@ -158,16 +154,18 @@ function flatten_result(result, max_tries=10)
         throw(error("too many tries"))
     end
 
-    vec = collect(Iterators.flatten(inputs))
+    #flattens an array of vectors to an arry
+    vec = collect(Iterators.flatten(inputs)) 
 
     res2vec(r::RESULT) = [r.cols, r.pos]
-    res = map(res2vec, results)
+    res = map(res2vec, results) #list comprehension is an alternative
     res = collect(Iterators.flatten(res))
 
     cols = (COLUMNS + 2) * max_tries
     matrix = zeros(Int8, 1, cols)
 
     matrix[1, 1:size(vec)[1]] = vec'
-    matrix[1, (max_tries * COLUMNS + 1):(max_tries * COLUMNS + 1 + size(res)[1]) ]
+    matrix[1, (max_tries * COLUMNS + 1):(max_tries * COLUMNS + size(res)[1]) ] = res'
+
     return matrix
 end
