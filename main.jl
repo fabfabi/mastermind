@@ -145,9 +145,16 @@ end
 
 
 function flatten_result(result, max_tries=10)
-    
-    inputs = result["choices"]
-    results = result["results"]
+
+    max_tries -= 1 #the last one will be popped...
+
+    inputs = copy(result["choices"])
+    results = copy(result["results"])
+    score = result["score"]
+
+    #delete last entry
+    solution = pop!(inputs)
+    pop!(results)
 
     score = result["score"]
     if score > 10
@@ -155,17 +162,40 @@ function flatten_result(result, max_tries=10)
     end
 
     #flattens an array of vectors to an arry
-    vec = collect(Iterators.flatten(inputs)) 
+    #vec = collect(Iterators.flatten(inputs)) 
 
     res2vec(r::RESULT) = [r.cols, r.pos]
-    res = map(res2vec, results) #list comprehension is an alternative
-    res = collect(Iterators.flatten(res))
+    #res = map(res2vec, results) #list comprehension is an alternative
+    #res = collect(Iterators.flatten(res))
 
-    cols = (COLUMNS + 2) * max_tries
-    matrix = zeros(Int8, 1, cols)
+    mem = Any[]
+    #the first columns have the score and the solution
+    col = zeros(Int8, 1, COLUMNS + 1)
+    col[1, 1] = score
+    col[1, 2:end] = solution
+    push!(mem, col)
 
-    matrix[1, 1:size(vec)[1]] = vec'
-    matrix[1, (max_tries * COLUMNS + 1):(max_tries * COLUMNS + size(res)[1]) ] = res'
+    #write one array containing vectors consisting of input and result
+    while length(inputs) > 0
+        in = pop!(inputs)
+        out = pop!(results)
+        col = zeros(Int8, 1, COLUMNS + 2)
+        col[1, 1:COLUMNS] = in
+        col[1, COLUMNS+1:end] = res2vec(out)'
+
+        push!(mem, col)
+    end
+    vec = collect(Iterators.flatten(mem)) 
+
+    matrix = zeros(Int8, 1, (max_tries + 1)* COLUMNS + 1)
+    matrix[1, 1:length(vec)] = vec'
+
+    #cols = (COLUMNS + 2) * max_tries + index
+
+    #the other columns have all the tries
+    #matrix = zeros(Int8, 1, cols)
+    #matrix[1, 1:size(vec)[1]] = vec'
+    #matrix[1, (max_tries * COLUMNS + 1):end ] = res'
 
     return matrix
 end
