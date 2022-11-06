@@ -58,3 +58,17 @@ end
     #this is 10 times as fast as the above one
 end
 
+tester = Foo(0)
+using BenchmarkTools
+
+@benchmark begin
+    tester.set_val(1)
+    tester.get_val()
+end
+
+tester2 = fastFoo(0)
+
+@benchmark begin
+    set_val!(tester2, :value, 1)
+    get_val!(tester2, :value)
+end
