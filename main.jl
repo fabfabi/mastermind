@@ -158,12 +158,7 @@ function result_2_matrix(result, max_tries=10)
         throw(error("too many tries"))
     end
 
-    #flattens an array of vectors to an arry
-    #vec = collect(Iterators.flatten(inputs)) 
-
     res2vec(r::RESULT) = [r.cols, r.pos]
-    #res = map(res2vec, results) #list comprehension is an alternative
-    #res = collect(Iterators.flatten(res))
 
     mem = Any[]
     #the first columns have the score and the solution
@@ -187,17 +182,10 @@ function result_2_matrix(result, max_tries=10)
     matrix = zeros(Int8, 1, (max_tries)* (COLUMNS + 2) + COLUMNS + 1)
     matrix[1, 1:length(vec)] = vec'
 
-    #cols = (COLUMNS + 2) * max_tries + index
-
-    #the other columns have all the tries
-    #matrix = zeros(Int8, 1, cols)
-    #matrix[1, 1:size(vec)[1]] = vec'
-    #matrix[1, (max_tries * COLUMNS + 1):end ] = res'
-
     return matrix
 end
 
-function result_generator(fname, multiplicity = 1, max_tries = 7)
+function result_generator(fname, multiplicity = 1, max_tries = 6)
     @time begin
         open(fname, "w") do file
 
