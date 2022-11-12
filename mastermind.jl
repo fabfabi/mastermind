@@ -1,5 +1,7 @@
 import Base.== #for overloading the operator
-"""Basic class to represent the internal functions needed for mastermind
+"""Basic class to represent the internal functions needed for mastermind.
+Import it via "using .MASTERMIND" (after include("mastermind.jl")).
+play() lets you play the game.
 """
 module MASTERMIND
 
@@ -322,7 +324,7 @@ module MASTERMIND
             print_all()
         end
     
-        println("CONTRATULATIONS, you found the correct solution")
+        println("CONTRATULATIONS, you solved the code :-)")
     
     end
 
