@@ -9,7 +9,7 @@ module MASTERMIND
 
     export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
 
-    export grade_result, auto_solver, result_generator, read_results
+    export grade_result, auto_solver, result_generator, read_results, play
 
     ############################################################################
     #####################    GLOBAL VARIABLES   ################################
@@ -281,7 +281,7 @@ module MASTERMIND
         println("########starting Mastermind. Please find out the code.########")
         println("##############################################################")
         function print_all()
-            for i = 1:10
+            for i = 1:30
                 println("")
             end
             for line in mem
