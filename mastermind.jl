@@ -300,7 +300,11 @@ module MASTERMIND
                 catch
                     println("Please only use integers")
                 else
-                    if size(in_list)[1] == COLUMNS
+                    if maximum(in_list) == minimum(in_list) == 0
+                        return 0
+                    elseif (maximum(in_list) > COLORS) | (minimum(in_list) < 1)
+                        println("please enter numbers between 1 and "*string(COLORS))
+                    elseif size(in_list)[1] == COLUMNS
                         res = grade_result(in_list, solution)
                         line = LINE(in_list', res)
                         return line
@@ -318,10 +322,15 @@ module MASTERMIND
         while result == false
             code_line = read_input()
             #code_line = LINE(new_code)
-            code_line.result = grade_result(code_line.code, solution)
-            result = code_line.result
-            push!(mem, code_line)
-            print_all()
+            try
+                code_line.result = grade_result(code_line.code, solution)
+                result = code_line.result
+                push!(mem, code_line)
+                print_all()
+            catch
+                println("exit")
+                return 0
+            end
         end
     
         println("CONTRATULATIONS, you solved the code :-)")
