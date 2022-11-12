@@ -7,7 +7,7 @@ module MASTERMIND
     using Random
     using CSV
 
-    export COLORS, COLUMNS, RESULT, CANDIDATES
+    export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
 
     export grade_result, auto_solver, result_generator, read_results
 
@@ -28,17 +28,45 @@ module MASTERMIND
 
     random_result() = rand(1 : COLORS, (1,COLUMNS))
 
+    """the result of the grading.
+    pos are the correct positions
+    cols are the correct colors"""
     mutable struct RESULT
         pos  :: Int
         cols :: Int
     end
-
     # overload the == operator
     Base.:(==)(c::RESULT, d::RESULT) = ((c.pos == d.pos) & (c.cols == d.cols)) 
     Base.:(!=)(c::RESULT, d::RESULT) = (!(c == d)) 
     Base.:(==)(c::RESULT, d::Bool)   = (d ? c.pos == COLUMNS : c.pos < COLUMNS) #the correct result is true
     Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
+
+    """resembles one line of input plus the graded result"""
+    mutable struct LINE
+        code #:: Vector{Float64}
+        result :: RESULT
+
+    end
+
+    function show(line :: LINE)
+        mem = ""
+        for i in line.code #1:size(line.code)[1]
+            mem *= string(i) #line.code[1, i])
+            mem *= " "
+        end
+    
+        mem *= " "
+        mem *= " "
+        mem *= string(line.result.pos)
+        mem *= " "
+        mem *= string(line.result.cols)
+        #mem *= " \n"
+        println(mem)
+    end
+    
+
+    
     """grades how good the input matches the solution. This function is symmetric.
     It returns the type RESULT"""
     function grade_result(input, solution)
@@ -59,8 +87,8 @@ module MASTERMIND
             end
         end
 
-        if correct_positions == 4
-            return RESULT(4, 0)
+        if correct_positions == COLUMNS
+            return RESULT(COLUMNS, 0)
         end
 
         for i = 1: COLUMNS, j = 1: COLUMNS
@@ -243,6 +271,59 @@ module MASTERMIND
         end
 
         return mem
+    end
+
+    """play against the machine"""
+    function play()
+        mem = Any[]
+    
+        println("##############################################################")
+        println("########starting Mastermind. Please find out the code.########")
+        println("##############################################################")
+        function print_all()
+            for i = 1:10
+                println("")
+            end
+            for line in mem
+                show(line)
+            end
+        end
+        function read_input()
+            while true
+                in_list = 0 #just to have it in the toplevel namespace
+                try
+                    in_str = readline()
+                    in_str = filter.(isdigit, collect.(in_str)) #remove everything that is not a number
+                    in_list = [parse(Int8, c) for c in in_str ]
+                catch
+                    println("Please only use integers")
+                else
+                    if size(in_list)[1] == COLUMNS
+                        res = grade_result(in_list, solution)
+                        line = LINE(in_list', res)
+                        return line
+                    else
+                        println("please enter "*string(COLUMNS)*" digits")
+                    end
+                end
+            end
+        end
+    
+        solution = random_result()
+        #print(solution)
+    
+        result = false
+        while result == false
+            code_line = read_input()
+            #code_line = LINE(new_code)
+            code_line.result = grade_result(code_line.code, solution)
+            result = code_line.result
+            push!(mem, code_line)
+            print_all()
+        end
+    
+        println("CONTRATULATIONS, you found the correct solution")
+    
     end
 
 end
