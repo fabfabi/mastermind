@@ -72,3 +72,14 @@ tester2 = fastFoo(0)
     set_val!(tester2, :value, 1)
     get_val!(tester2, :value)
 end
+
+GLOBAL = 2
+
+mutable struct test
+    a :: Matrix
+    function read(line::test)
+        a = zeros(1, GLOBAL)
+        return test(a)
+    end
+
+end 
