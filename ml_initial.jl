@@ -5,22 +5,26 @@ using Flux
 using Flux: train!, onecold, mean
 using BSON: @save
 
-THRESHOLD = 0.8 # --> x % Training data
-multiplicity = 6
+
+multiplicity = 7
 
 
 
-decisions = DataFrame(code = CANDIDATES)
+
 
 
 """
+decisions = DataFrame(code = CANDIDATES)
+THRESHOLD = 0.8 # --> x % Training data
 write_purpose(num :: Float64) = num > THRESHOLD ? "test" : "train"
 decide_purpose(in) = write_purpose.(rand(size(in)...))
 df.purpose = decide_purpose(df.code)
-"""
 
 decision(in)=  rand() > THRESHOLD ? "test" : "train"
 decisions.purpose = broadcast(decision, decisions.code)
+"""
+
+
 function read_data(fname)
     data_raw = read_results(fname)
 
@@ -43,24 +47,25 @@ function read_data(fname)
     return x_data, y_data
 end
 
-x_train, y_train = read_data("training_results_10.txt")
+x_train, y_train = read_data("training_results_100_7.txt")
 
-x_test, y_test_raw = read_data("testing_results_10.txt")
+x_test, y_test_raw = read_data("training_results_10_7.txt")
 
+n_middle = 48
 model = Chain(
-    Dense(210, 64, relu),
-    Dense(64, COLUMNS * COLORS),
+    Dense(size(x_train)[1], n_middle, relu),
+    Dense(n_middle,COLUMNS * COLORS),
     softmax
 )
 
-loss(x,y) = Flux.crossentropy(model(x), y)
+loss(x,y) = Flux.crossentropy(model(x), y; dims = COLUMNS)
 ps = Flux.params(model)
 
 learning_rate = 0.01
 
 opt = Flux.ADAM(learning_rate)
 loss_history = []
-epochs = 100
+epochs = 10
 
 for epoch in 1:epochs
     Flux.train!(loss, ps, [(x_train, y_train)], opt)
