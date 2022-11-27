@@ -58,6 +58,7 @@ n_middle = 77 #floor(sqrt(size(x_train)[1] * COLUMNS * COLORS ))
 model = Chain(
     Dense(size(x_train)[1], n_middle, relu),
     Dense(n_middle,n_middle),
+    Dense(n_middle,n_middle),
     Dense(n_middle,COLUMNS * COLORS),
     softmax
 )
@@ -80,7 +81,7 @@ for epoch in 1:epochs
     end
 end
 
-y_hat_raw = model(x_test)
+
 
 """one cold just returns the index with the highest probability. We need to split the data into 
 4 columns and re-assemble the matrix"""
@@ -91,6 +92,8 @@ function multi_onecold(data)
     end
     return return_data
 end
+
+y_hat_raw = model(x_test)
 
 y_hat = multi_onecold(y_hat_raw)
 
@@ -104,6 +107,8 @@ index = collect(1:size(y_hat)[2])
 
 check_display = [index y_hat' y_test' check]
 
+println("recognized codes: "* string(100 * mean(check))*"%")
+
 vscodedisplay(check_display)
 
-@save "20221119_second_model_high.bson" model
+@save "20221119_77_hidden_nodes.bson" model
