@@ -33,7 +33,7 @@ module MASTERMIND
     """the result of the grading.
     pos are the correct positions
     cols are the correct colors"""
-    mutable struct RESULT
+    struct RESULT
         pos  :: Int
         cols :: Int
     end
@@ -44,11 +44,14 @@ module MASTERMIND
     Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
 
+    """resembles one raw line of input (excl. result)"""
+    struct RAW_LINE
+        code :: Matrix
+    end
     """resembles one line of input plus the graded result"""
-    mutable struct LINE
-        code #:: Vector{Float64}
+    struct LINE
+        code :: LINE
         result :: RESULT
-
     end
 
     function show(line :: LINE)
@@ -94,7 +97,9 @@ module MASTERMIND
         end
 
         for i = 1: COLUMNS, j = 1: COLUMNS
-            if in[i] == 0 || sol[j] == 0
+            if i == j
+                continue
+            elseif in[i] == 0 || sol[j] == 0
                 continue
             elseif in[i] == sol[j]
                 correct_colors += 1
@@ -306,7 +311,7 @@ module MASTERMIND
                         println("please enter numbers between 1 and "*string(COLORS))
                     elseif size(in_list)[1] == COLUMNS
                         res = grade_result(in_list, solution)
-                        line = LINE(in_list', res)
+                        line = LINE(RAW_LINE(in_list'), res)
                         return line
                     else
                         println("please enter "*string(COLUMNS)*" digits")
@@ -316,7 +321,7 @@ module MASTERMIND
         end
     
         solution = random_result()
-        #print(solution)
+        print(solution)
     
         result = false
         while result == false
