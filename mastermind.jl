@@ -1,3 +1,6 @@
+using Distributed
+using SharedArrays
+
 import Base.== #for overloading the operator
 """Basic class to represent the internal functions needed for mastermind.
 Import it via "using .MASTERMIND" (after include("mastermind.jl")).
@@ -143,7 +146,7 @@ module MASTERMIND
     function array_list()
         liste = full_list()
         rows, cols = size(liste)
-        output = Any[]
+        output = SharedArray{Any}[]
 
         for i = 1:rows
             push!(output, liste[i, :])
@@ -340,6 +343,11 @@ module MASTERMIND
     
         println("CONTRATULATIONS, you solved the code :-)")
     
+    end
+
+    """grade all lines"""
+    function grade_lines_1(input_lines::SharedArrays{RAW_LINE}, result :: LINE) :: SharedArrays{LINE}
+
     end
 
 end
