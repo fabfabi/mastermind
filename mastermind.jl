@@ -1,5 +1,4 @@
-using Distributed
-using SharedArrays
+
 
 import Base.== #for overloading the operator
 """Basic class to represent the internal functions needed for mastermind.
@@ -7,10 +6,10 @@ Import it via "using .MASTERMIND" (after include("mastermind.jl")).
 play() lets you play the game.
 """
 module MASTERMIND
-
-    
     using Random
     using CSV
+    using Distributed
+    using SharedArrays
 
     export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
 
@@ -53,13 +52,21 @@ module MASTERMIND
     end
     """resembles one line of input plus the graded result"""
     struct LINE
-        code :: LINE
+        code :: RAW_LINE
         result :: RESULT
     end
 
+    mutable struct SOLUTION
+        input :: RAW_LINE
+        next_step :: Dict{RESULT, SOLUTION}
+        candidates :: Array{RAW_LINE}
+    end
+
+
+
     function show(line :: LINE)
         mem = ""
-        for i in line.code #1:size(line.code)[1]
+        for i in line.code.code #1:size(line.code)[1]
             mem *= string(i) #line.code[1, i])
             mem *= " "
         end
@@ -142,11 +149,20 @@ module MASTERMIND
 
     end
 
+    function raw_line_list()
+        liste = full_list()
+        rows, _ = size(liste)
+        output = Array{RAW_LINE}[]
+        for i = 1:rows
+            push!(output, RAW_LINE(liste[i, :]))
+        end
+    end
+
 
     function array_list()
         liste = full_list()
-        rows, cols = size(liste)
-        output = SharedArray{Any}[]
+        rows, _ = size(liste)
+        output = Array{Any}[]
 
         for i = 1:rows
             push!(output, liste[i, :])
@@ -328,15 +344,16 @@ module MASTERMIND
     
         result = false
         while result == false
-            code_line = read_input()
+            code_line = read_input() #includes graded result
             #code_line = LINE(new_code)
             try
-                code_line.result = grade_result(code_line.code, solution)
+                #code_line.result = grade_result(code_line.code, solution)
                 result = code_line.result
                 push!(mem, code_line)
                 print_all()
-            catch
+            catch error
                 println("exit")
+                throw(error)
                 return 0
             end
         end
@@ -345,9 +362,24 @@ module MASTERMIND
     
     end
 
-    """grade all lines"""
-    function grade_lines_1(input_lines::SharedArrays{RAW_LINE}, result :: LINE) :: SharedArrays{LINE}
+end
 
+function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
+    best_val = 1000000
+    #pids = ParallelUtilities.workers_myhost()
+    for candidate in candidates
+        counter = Dict{RESULT, Int}()
+
+        for c in candidates
+            result = grade_result(candidate, c)
+            counter[result] = get(counter, result, 0) + 1
+        end
+        current_val = maximum(values(counter))
+        if current_val < best_val
+            best_val = current_val
+            best_candidate = candidate
+        end
     end
 
+    return best_candidate
 end
