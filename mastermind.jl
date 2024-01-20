@@ -1,6 +1,6 @@
 
 
-import Base.== #for overloading the operator
+
 """Basic class to represent the internal functions needed for mastermind.
 Import it via "using .MASTERMIND" (after include("mastermind.jl")).
 play() lets you play the game.
@@ -10,6 +10,7 @@ module MASTERMIND
     using CSV
     using Distributed
     using SharedArrays
+    import Base.== #for overloading the operator
 
     export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
 
@@ -48,7 +49,7 @@ module MASTERMIND
 
     """resembles one raw line of input (excl. result)"""
     struct RAW_LINE
-        code :: Matrix
+        code :: Vector{Int8}
     end
     """resembles one line of input plus the graded result"""
     struct LINE
@@ -152,10 +153,12 @@ module MASTERMIND
     function raw_line_list()
         liste = full_list()
         rows, _ = size(liste)
-        output = Array{RAW_LINE}[]
+        output = RAW_LINE[]
         for i = 1:rows
-            push!(output, RAW_LINE(liste[i, :]))
+            push!(output, RAW_LINE(vec(liste[i, :])))
         end
+
+        return output
     end
 
 
@@ -364,6 +367,8 @@ module MASTERMIND
 
 end
 
+RAW_LINE = MASTERMIND.RAW_LINE
+
 function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
     best_val = 1000000
     #pids = ParallelUtilities.workers_myhost()
@@ -383,3 +388,5 @@ function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
 
     return best_candidate
 end
+
+l = MASTERMIND.raw_line_list()
