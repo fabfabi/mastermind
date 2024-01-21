@@ -4,20 +4,21 @@ addprocs(10)
 
 @everywhere include("mastermind.jl")
 @everywhere using .MASTERMIND
-@everywhere using Test
-@everywhere using Logging
-#using DataStructures
-#using Distributed
-#using ParallelUtilities
-#using SharedArrays
+using Test
+using Logging
+using DataStructures
+using Distributed
+using ParallelUtilities
+using SharedArrays
 using BenchmarkTools
 
 
-
+#=
 @everywhere using ParallelUtilities
 @everywhere using SharedArrays
 @everywhere using Distributed
 @everywhere using DataStructures
+=#
 #@everywhere using Pkg
 #@everywhere Pkg.activate("~")
 #@everywhere using .MASTERMIND
@@ -38,14 +39,14 @@ function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
         return candidates[1]
     end
     
-    #pids = ParallelUtilities.workers_myhost()
     for candidate in candidates
-        #mem = SharedArray{RESULT}((L,), pids = pids)
-        mem = SharedArray{Int}((L,), pids = pids)
+        #= 
+        mem = SharedArray{RESULT}((L,), pids = pids)
 
         @sync @distributed for i = 1 : L
-            mem[i] = i#RESULT(i, 0) #grade_result(candidate, candidates[i])
-        end
+            mem[i] = grade_result(candidate, candidates[i])
+        end =#
+        mem = pmap(x -> grade_result(candidate, x), candidates, distributed=true)
 
         counter_dict = counter(mem)
         current_val = maximum(values(counter_dict))
@@ -60,6 +61,7 @@ end
 
 @test minmax_candidate(raw_line_list()) == RAW_LINE(vec([1 1 2 2]))
 
+@benchmark minmax_candidate(raw_line_list())
 """
 reduces the list of candidates to only those that create the same result as the input
 """
