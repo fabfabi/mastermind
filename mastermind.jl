@@ -12,6 +12,7 @@ module MASTERMIND
     using SharedArrays
     using Test
     using Logging
+    using DataStructures
 
     import Base.== #for overloading the operator
 
@@ -404,6 +405,18 @@ end
 using .MASTERMIND
 using Test
 using Logging
+using DataStructures
+using Distributed
+using ParallelUtilities
+using SharedArrays
+using BenchmarkTools
+
+@everywhere using ParallelUtilities
+@everywhere using SharedArrays
+@everywhere using Distributed
+@everywhere using DataStructures
+@everywhere using .MASTERMIND
+
 
 global_logger(Logging.SimpleLogger(Debug))
 
@@ -416,20 +429,22 @@ raw_line_list = MASTERMIND.raw_line_list
 function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
     best_val = 1000000
     best_candidate = "None"
-
-    if size(candidates)[1] == 1
+    pids = ParallelUtilities.workers_myhost()
+    L = length(candidates)
+    if L== 1
         return candidates[1]
     end
-
+    
     #pids = ParallelUtilities.workers_myhost()
     for candidate in candidates
-        counter = Dict{RESULT, Int}()
+        mem = SharedArray{RESULT}((length(candidates),), pids = pids)
 
-        for c in candidates
-            result = grade_result(candidate, c)
-            counter[result] = get(counter, result, 0) + 1
+        @sync @distributed for i = 1 : L
+            mem[i] =grade_result(candidate, candidates[i])
         end
-        current_val = maximum(values(counter))
+
+        counter_dict = counter(mem)
+        current_val = maximum(values(counter_dict))
         if current_val < best_val
             best_val = current_val
             best_candidate = candidate
