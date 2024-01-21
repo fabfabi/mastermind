@@ -1,11 +1,12 @@
-
-
+using Distributed
+addprocs(10)
 
 """Basic class to represent the internal functions needed for mastermind.
 Import it via "using .MASTERMIND" (after include("mastermind.jl")).
 play() lets you play the game.
 """
-module MASTERMIND
+
+@everywhere module MASTERMIND
     using Random
     using CSV
     using Distributed
@@ -16,9 +17,11 @@ module MASTERMIND
 
     import Base.== #for overloading the operator
 
-    export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
+    export COLORS, COLUMNS, RESULT, CANDIDATES, LINE, SOLUTION
 
-    export grade_result, auto_solver, result_generator, read_results, play
+    export RAW_LINE, LINE, RESULT
+
+    export grade_result, auto_solver, result_generator, read_results, play, raw_line_list
 
     ############################################################################
     #####################    GLOBAL VARIABLES   ################################
@@ -402,28 +405,31 @@ module MASTERMIND
 
 end
 
-using .MASTERMIND
+@everywhere using .MASTERMIND
 using Test
 using Logging
-using DataStructures
-using Distributed
-using ParallelUtilities
-using SharedArrays
+#using DataStructures
+#using Distributed
+#using ParallelUtilities
+#using SharedArrays
 using BenchmarkTools
+
+
 
 @everywhere using ParallelUtilities
 @everywhere using SharedArrays
 @everywhere using Distributed
 @everywhere using DataStructures
 @everywhere using .MASTERMIND
+#@everywhere using Pkg
+#@everywhere Pkg.activate("~")
+#@everywhere using .MASTERMIND
+#@everywhere RAW_LINE = MASTERMIND.RAW_LINE
+#@everywhere grade_result = MASTERMIND.grade_result
 
 
 global_logger(Logging.SimpleLogger(Debug))
 
-RAW_LINE = MASTERMIND.RAW_LINE
-SOLUTION = MASTERMIND.SOLUTION
-RESULT = MASTERMIND.RESULT
-raw_line_list = MASTERMIND.raw_line_list
 
 """ find the candidate that minimizes the maximum group size per individual result"""
 function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
@@ -437,10 +443,10 @@ function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
     
     #pids = ParallelUtilities.workers_myhost()
     for candidate in candidates
-        mem = SharedArray{RESULT}((length(candidates),), pids = pids)
+        mem = SharedArray{RESULT}((L,), pids = pids)
 
         @sync @distributed for i = 1 : L
-            mem[i] =grade_result(candidate, candidates[i])
+            mem[i] =i #grade_result(candidate, candidates[i])
         end
 
         counter_dict = counter(mem)
