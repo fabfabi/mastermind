@@ -120,7 +120,6 @@ module MASTERMIND
     
     """grades how good the input matches the solution. This function is symmetric.
     It returns the type RESULT
-    result: 5828 tries for 1296 combinations
     """
     function grade_result(input::RAW_LINE, solution::RAW_LINE)
         

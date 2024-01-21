@@ -19,6 +19,7 @@ global_logger(Logging.SimpleLogger(Debug))
 global_logger(Logging.SimpleLogger(Info))
 """
 find the best candidate that creates the minimum number of future candidates per result
+result: 5828 tries for 1296 combinations
 """
 function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
 
