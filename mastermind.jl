@@ -11,6 +11,7 @@ module MASTERMIND
     using Test
     using Logging
     using DataStructures
+    using ParallelUtilities
 
     import Base.== #for overloading the operator
 
