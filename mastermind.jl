@@ -157,10 +157,10 @@ module MASTERMIND
         return RESULT(correct_positions, correct_colors)
     end
     gradetest(a, b) = grade_result(RAW_LINE(vec(a)), RAW_LINE(vec(b)))
-    @test gradetest([1, 0, 0], [2, 0, 0]) == RESULT(2, 0)
-    @test gradetest([1, 0, 0], [1, 0, 0]) == RESULT(3, 0)
-    @test gradetest([1, 2, 3], [2, 3, 1]) == RESULT(0, 3)
-    @test gradetest([1, 2, 0], [1, 0, 3]) == RESULT(1, 1)
+    @test gradetest([1, 3, 3, 5], [2, 3, 3, 6]) == RESULT(2, 0)
+    @test gradetest([1, 3, 3, 5], [1, 3, 3, 6]) == RESULT(3, 0)
+    @test gradetest([1, 2, 3, 5], [2, 3, 1, 6]) == RESULT(0, 3)
+    @test gradetest([1, 2, 4, 5], [1, 4, 3, 6]) == RESULT(1, 1)
 
     function full_list()
 
