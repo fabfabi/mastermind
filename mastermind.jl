@@ -10,6 +10,7 @@ module MASTERMIND
     using CSV
     using Distributed
     using SharedArrays
+    using Test
     import Base.== #for overloading the operator
 
     export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
@@ -37,8 +38,8 @@ module MASTERMIND
     pos are the correct positions
     cols are the correct colors"""
     struct RESULT
-        pos  :: Int
-        cols :: Int
+        pos  :: Int8
+        cols :: Int8
     end
     # overload the == operator
     Base.:(==)(c::RESULT, d::RESULT) = ((c.pos == d.pos) & (c.cols == d.cols)) 
@@ -46,17 +47,42 @@ module MASTERMIND
     Base.:(==)(c::RESULT, d::Bool)   = (d ? c.pos == COLUMNS : c.pos < COLUMNS) #the correct result is true
     Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
-    
+    @test RESULT(2,1) == RESULT(2,1)
+    @test RESULT(2,1) != RESULT(1,1)
+    @test (RESULT(COLUMNS,0) == true)
+    @test (RESULT(COLUMNS-1,0) != true)
 
     """resembles one raw line of input (excl. result)"""
     struct RAW_LINE
         code :: Vector{Int8}
     end
+
+    Base.:(==)(a::RAW_LINE, b::RAW_LINE) = begin
+        if size(a.code) != size(b.code)
+            return false
+        end
+        rows = size(a.code)[1]
+        for i = 1:rows
+            if a.code[i] != b.code[i]
+                return false
+            end
+        end
+        return true
+
+    end
+    Base.:(!=)(a::RAW_LINE, b::RAW_LINE) = (!(a == b))
+
+    @test RAW_LINE([1, 2, 3]) == RAW_LINE([1, 2, 3])
+    @test RAW_LINE([1, 2, 3]) != RAW_LINE([1, 2, 4])
+    @test RAW_LINE([1, 2, 3]) != RAW_LINE([1, 2, 3, 4])
+
     """resembles one line of input plus the graded result"""
     struct LINE
         code :: RAW_LINE
         result :: RESULT
     end
+    Base.:(==)(a::LINE, b::LINE) = ((a.code == b.code) & (a.result == b.result))
+    Base.:(!=)(a::LINE, b::LINE) = (!(a == b))
 
     mutable struct SOLUTION
         input :: RAW_LINE
@@ -375,9 +401,18 @@ end
 
 using .MASTERMIND
 
+RAW_LINE = MASTERMIND.RAW_LINE
+SOLUTION = MASTERMIND.SOLUTION
+RESULT = MASTERMIND.RESULT
 
 function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
     best_val = 1000000
+    best_candidate = "None"
+
+    if size(candidates)[1] == 1
+        return candidates[1]
+    end
+
     #pids = ParallelUtilities.workers_myhost()
     for candidate in candidates
         counter = Dict{RESULT, Int}()
@@ -396,4 +431,17 @@ function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
     return best_candidate
 end
 
-l = MASTERMIND.raw_line_list()
+@test candidate_check(MASTERMIND.raw_line_list()) == RAW_LINE(vec([1 1 2 2]))
+
+function reduce_candidates(candidates :: Array{RAW_LINE}, input :: RAW_LINE, result :: RESULT) :: Array{RAW_LINE}
+    rows, _ = size(candidates)
+    output = RAW_LINE[]
+    for candidate in candidates
+        if grade_result(candidate, input) == result
+            push!(output, RAW_LINE(vec(liste[i, :])))
+        end
+    end
+    return output
+end
+
+l = MASTERMIND.raw_line_list()[1:10]
