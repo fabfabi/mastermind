@@ -31,7 +31,7 @@ module MASTERMIND
     ############################################################################
 
 
-    random_result() = rand(1 : COLORS, (1,COLUMNS))
+    random_result() = RAW_LINE(vec(rand(1 : COLORS, (1,COLUMNS))))
 
     """the result of the grading.
     pos are the correct positions
@@ -46,6 +46,7 @@ module MASTERMIND
     Base.:(==)(c::RESULT, d::Bool)   = (d ? c.pos == COLUMNS : c.pos < COLUMNS) #the correct result is true
     Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
+    
 
     """resembles one raw line of input (excl. result)"""
     struct RAW_LINE
@@ -63,7 +64,11 @@ module MASTERMIND
         candidates :: Array{RAW_LINE}
     end
 
-
+    #=
+    println(c :: RAW_LINE) = Base.println(c.code)
+    println(l :: LINE) = Base.println(l.code.code)
+    println(x) = Base.println(x)
+    =#
 
     function show(line :: LINE)
         mem = ""
@@ -85,11 +90,11 @@ module MASTERMIND
     
     """grades how good the input matches the solution. This function is symmetric.
     It returns the type RESULT"""
-    function grade_result(input, solution)
+    function grade_result(input::RAW_LINE, solution::RAW_LINE)
         
 
-        in = copy(input)
-        sol = copy(solution)
+        in = copy(input.code)
+        sol = copy(solution.code)
 
         correct_positions = 0
         correct_colors = 0
@@ -332,8 +337,9 @@ module MASTERMIND
                     elseif (maximum(in_list) > COLORS) | (minimum(in_list) < 1)
                         println("please enter numbers between 1 and "*string(COLORS))
                     elseif size(in_list)[1] == COLUMNS
-                        res = grade_result(in_list, solution)
-                        line = LINE(RAW_LINE(in_list'), res)
+                        input = RAW_LINE(vec(in_list))
+                        res = grade_result(input, solution)
+                        line = LINE(input, res)
                         return line
                     else
                         println("please enter "*string(COLUMNS)*" digits")
@@ -367,7 +373,8 @@ module MASTERMIND
 
 end
 
-RAW_LINE = MASTERMIND.RAW_LINE
+using .MASTERMIND
+
 
 function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
     best_val = 1000000
