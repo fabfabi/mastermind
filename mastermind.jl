@@ -1,17 +1,25 @@
-import Base.== #for overloading the operator
+
 """Basic class to represent the internal functions needed for mastermind.
 Import it via "using .MASTERMIND" (after include("mastermind.jl")).
 play() lets you play the game.
 """
 module MASTERMIND
-
-    
     using Random
     using CSV
+    using Distributed
+    using SharedArrays
+    using Test
+    using Logging
+    using DataStructures
+    using ParallelUtilities
 
-    export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
+    import Base.== #for overloading the operator
 
-    export grade_result, auto_solver, result_generator, read_results, play
+    export COLORS, COLUMNS, RESULT, CANDIDATES, LINE, SOLUTION
+
+    export RAW_LINE, LINE, RESULT
+
+    export grade_result, auto_solver, result_generator, read_results, play, raw_line_list
 
     ############################################################################
     #####################    GLOBAL VARIABLES   ################################
@@ -28,14 +36,14 @@ module MASTERMIND
     ############################################################################
 
 
-    random_result() = rand(1 : COLORS, (1,COLUMNS))
+    random_result() = RAW_LINE(vec(rand(1 : COLORS, (1,COLUMNS))))
 
     """the result of the grading.
     pos are the correct positions
     cols are the correct colors"""
-    mutable struct RESULT
-        pos  :: Int
-        cols :: Int
+    struct RESULT
+        pos  :: Int8
+        cols :: Int8
     end
     # overload the == operator
     Base.:(==)(c::RESULT, d::RESULT) = ((c.pos == d.pos) & (c.cols == d.cols)) 
@@ -43,17 +51,58 @@ module MASTERMIND
     Base.:(==)(c::RESULT, d::Bool)   = (d ? c.pos == COLUMNS : c.pos < COLUMNS) #the correct result is true
     Base.:(!=)(c::RESULT, d::Bool)   = (!(c == d)) #the correct result is true
 
+    @test RESULT(2,1) == RESULT(2,1)
+    @test RESULT(2,1) != RESULT(1,1)
+    @test (RESULT(COLUMNS,0) == true)
+    @test (RESULT(COLUMNS-1,0) != true)
 
-    """resembles one line of input plus the graded result"""
-    mutable struct LINE
-        code #:: Vector{Float64}
-        result :: RESULT
+    """resembles one raw line of input (excl. result)"""
+    struct RAW_LINE
+        code :: Vector{Int8}
+    end
+
+    Base.:(==)(a::RAW_LINE, b::RAW_LINE) = begin
+        if size(a.code) != size(b.code)
+            return false
+        end
+        rows = size(a.code)[1]
+        for i = 1:rows
+            if a.code[i] != b.code[i]
+                return false
+            end
+        end
+        return true
 
     end
+    Base.:(!=)(a::RAW_LINE, b::RAW_LINE) = (!(a == b))
+
+    @test RAW_LINE([1, 2, 3]) == RAW_LINE([1, 2, 3])
+    @test RAW_LINE([1, 2, 3]) != RAW_LINE([1, 2, 4])
+    @test RAW_LINE([1, 2, 3]) != RAW_LINE([1, 2, 3, 4])
+
+    """resembles one line of input plus the graded result"""
+    struct LINE
+        code :: RAW_LINE
+        result :: RESULT
+    end
+    Base.:(==)(a::LINE, b::LINE) = ((a.code == b.code) & (a.result == b.result))
+    Base.:(!=)(a::LINE, b::LINE) = (!(a == b))
+
+    mutable struct SOLUTION
+        input :: RAW_LINE
+        next_step :: Dict{RESULT, SOLUTION}
+        candidates :: Array{RAW_LINE}
+    end
+
+    #=
+    println(c :: RAW_LINE) = Base.println(c.code)
+    println(l :: LINE) = Base.println(l.code.code)
+    println(x) = Base.println(x)
+    =#
 
     function show(line :: LINE)
         mem = ""
-        for i in line.code #1:size(line.code)[1]
+        for i in line.code.code #1:size(line.code)[1]
             mem *= string(i) #line.code[1, i])
             mem *= " "
         end
@@ -70,12 +119,14 @@ module MASTERMIND
 
     
     """grades how good the input matches the solution. This function is symmetric.
-    It returns the type RESULT"""
-    function grade_result(input, solution)
+    It returns the type RESULT
+    result: 5828 tries for 1296 combinations
+    """
+    function grade_result(input::RAW_LINE, solution::RAW_LINE)
         
 
-        in = copy(input)
-        sol = copy(solution)
+        in = copy(input.code)
+        sol = copy(solution.code)
 
         correct_positions = 0
         correct_colors = 0
@@ -94,7 +145,9 @@ module MASTERMIND
         end
 
         for i = 1: COLUMNS, j = 1: COLUMNS
-            if in[i] == 0 || sol[j] == 0
+            if i == j
+                continue
+            elseif in[i] == 0 || sol[j] == 0
                 continue
             elseif in[i] == sol[j]
                 correct_colors += 1
@@ -105,6 +158,11 @@ module MASTERMIND
         #return correct_positions, correct_colors
         return RESULT(correct_positions, correct_colors)
     end
+    gradetest(a, b) = grade_result(RAW_LINE(vec(a)), RAW_LINE(vec(b)))
+    @test gradetest([1, 3, 3, 5], [2, 3, 3, 6]) == RESULT(2, 0)
+    @test gradetest([1, 3, 3, 5], [1, 3, 3, 6]) == RESULT(3, 0)
+    @test gradetest([1, 2, 3, 5], [2, 3, 1, 6]) == RESULT(0, 3)
+    @test gradetest([1, 2, 4, 5], [1, 4, 3, 6]) == RESULT(1, 1)
 
     function full_list()
 
@@ -134,11 +192,22 @@ module MASTERMIND
 
     end
 
+    function raw_line_list()
+        liste = full_list()
+        rows, _ = size(liste)
+        output = RAW_LINE[]
+        for i = 1:rows
+            push!(output, RAW_LINE(vec(liste[i, :])))
+        end
+
+        return output
+    end
+
 
     function array_list()
         liste = full_list()
-        rows, cols = size(liste)
-        output = Any[]
+        rows, _ = size(liste)
+        output = Array{Any}[]
 
         for i = 1:rows
             push!(output, liste[i, :])
@@ -305,8 +374,9 @@ module MASTERMIND
                     elseif (maximum(in_list) > COLORS) | (minimum(in_list) < 1)
                         println("please enter numbers between 1 and "*string(COLORS))
                     elseif size(in_list)[1] == COLUMNS
-                        res = grade_result(in_list, solution)
-                        line = LINE(in_list', res)
+                        input = RAW_LINE(vec(in_list))
+                        res = grade_result(input, solution)
+                        line = LINE(input, res)
                         return line
                     else
                         println("please enter "*string(COLUMNS)*" digits")
@@ -316,19 +386,20 @@ module MASTERMIND
         end
     
         solution = random_result()
-        #print(solution)
+        print(solution)
     
         result = false
         while result == false
-            code_line = read_input()
+            code_line = read_input() #includes graded result
             #code_line = LINE(new_code)
             try
-                code_line.result = grade_result(code_line.code, solution)
+                #code_line.result = grade_result(code_line.code, solution)
                 result = code_line.result
                 push!(mem, code_line)
                 print_all()
-            catch
+            catch error
                 println("exit")
+                throw(error)
                 return 0
             end
         end
