@@ -11,6 +11,8 @@ module MASTERMIND
     using Distributed
     using SharedArrays
     using Test
+    using Logging
+
     import Base.== #for overloading the operator
 
     export COLORS, COLUMNS, RESULT, CANDIDATES, LINE
@@ -400,12 +402,18 @@ module MASTERMIND
 end
 
 using .MASTERMIND
+using Test
+using Logging
+
+global_logger(Logging.SimpleLogger(Debug))
 
 RAW_LINE = MASTERMIND.RAW_LINE
 SOLUTION = MASTERMIND.SOLUTION
 RESULT = MASTERMIND.RESULT
+raw_line_list = MASTERMIND.raw_line_list
 
-function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
+""" find the candidate that minimizes the maximum group size per individual result"""
+function minmax_candidate(candidates :: Array{RAW_LINE}) :: RAW_LINE
     best_val = 1000000
     best_candidate = "None"
 
@@ -431,17 +439,42 @@ function candidate_check(candidates :: Array{RAW_LINE}) :: RAW_LINE
     return best_candidate
 end
 
-@test candidate_check(MASTERMIND.raw_line_list()) == RAW_LINE(vec([1 1 2 2]))
+@test minmax_candidate(raw_line_list()) == RAW_LINE(vec([1 1 2 2]))
 
+"""
+reduces the list of candidates to only those that create the same result as the input
+"""
 function reduce_candidates(candidates :: Array{RAW_LINE}, input :: RAW_LINE, result :: RESULT) :: Array{RAW_LINE}
-    rows, _ = size(candidates)
+    #rows = size(candidates)[1]
     output = RAW_LINE[]
     for candidate in candidates
         if grade_result(candidate, input) == result
-            push!(output, RAW_LINE(vec(liste[i, :])))
+            push!(output, candidate)
         end
     end
     return output
+end
+@test reduce_candidates(raw_line_list(), RAW_LINE(vec([1, 1, 2, 2])), RESULT(4,0)) == vec([RAW_LINE(vec([1, 1, 2, 2]))])
+
+function minmax_solver(solution :: RAW_LINE) :: Int
+    @debug "finding solution for " *string(solution.code)
+    counter = 1
+    candidates = raw_line_list()
+    while length(candidates) > 1
+        next_candidate = minmax_candidate(candidates)
+        result = grade_result(solution, next_candidate)
+        candidates = reduce_candidates(candidates, next_candidate, result)
+        if result == true
+            @debug string(counter)*" solution found: "*string(next_candidate.code)
+            break
+        else
+            @debug string(counter)*" candidate is "*string(next_candidate.code) * "("*string(length(candidates))*")"
+        end
+        counter += 1
+    end
+    
+
+    return counter
 end
 
 l = MASTERMIND.raw_line_list()[1:10]
