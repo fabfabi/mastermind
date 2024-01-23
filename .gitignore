@@ -1,2 +1,4 @@
 test.jl
 *.txt
+rust/target/*
+*Cargo.lock
