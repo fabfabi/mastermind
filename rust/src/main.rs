@@ -85,7 +85,10 @@ mod tests {
         let c = get_ct(9, 9, 9, 9);
         assert_eq!(c.grade(a), ResultType{positions: 0, colors: 0});
         let d = get_ct(2,1,3,4);
-        assert_eq!(a.grade(d), ResultType{positions:0, colors:2});
+        let res = ResultType{positions:0, colors:2};
+        assert_eq!(a.grade(d), res);
+        let line = LineType::new(a, d);
+        assert_eq!(line.result, res);
     }
     
 }
