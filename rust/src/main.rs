@@ -1,12 +1,13 @@
 const COLUMNS: usize = 4;
 const COLORS: u8 = 6;
+//const TOTAL_COMBINATIONS: u64 = 
 
 #[derive(Copy, Clone)]
 struct CodeType {
     entries : [u8; COLUMNS],
 }
 impl CodeType{
-    fn grade(self : CodeType, solution : CodeType) -> ResultType{
+    fn grade(self : CodeType, solution: &CodeType) -> ResultType{
         let mut line_bool = [false; COLUMNS];
         let mut solution_bool =  [false; COLUMNS];
         let mut positions : u8 = 0;
@@ -40,25 +41,52 @@ impl CodeType{
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
+//#[derive(Copy, Clone, PartialEq, Debug)]
 struct ResultType {
     positions : u8,
     colors : u8,
 }
 
-#[derive(Copy, Clone)]
+//#[derive(Copy, Clone)]
 struct LineType{
     code: CodeType,
     result: ResultType,
 }
 impl LineType {
-    fn new(new_line : CodeType, solution : CodeType) -> LineType {
+    fn new(new_line : CodeType, solution : &CodeType) -> LineType {
         let result = new_line.grade(solution);
         return LineType{code:new_line, result:result}
     }
 }
 
+fn get_all_codes() -> Vec<CodeType>{
+    let mut line = [0u8; COLUMNS];
+    let mut all_possible_lines: Vec<CodeType> = Vec::new();
+    all_possible_lines.push(CodeType{entries:line});
+    //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
 
+    fn augment(line: &mut [u8;COLUMNS], index : usize) -> Result<[u8;COLUMNS],&'static str>{
+        if index == -1 {
+            Err("All combinations found")
+        }
+        else if line[index] == (COLORS -1) {
+            line[index] = 0 ;
+            augment(line, index-1)
+            }
+        else {
+            {line[index] += 1}
+        }
+
+        
+    }
+
+    for i in 1.. 5{//num_combinations{
+
+    }
+
+    return all_possible_lines;
+}
 
 fn main() {
     println!("Hello, world!");
@@ -81,13 +109,13 @@ mod tests {
         }
         let a = get_ct(1,2,2,0);
         let b = get_ct(1,3,3,4);
-        assert_eq!(b.grade(a), ResultType{positions:1,colors:0});
+        assert_eq!(b.grade(&a), ResultType{positions:1,colors:0});
         let c = get_ct(9, 9, 9, 9);
-        assert_eq!(c.grade(a), ResultType{positions: 0, colors: 0});
+        assert_eq!(c.grade(&a), ResultType{positions: 0, colors: 0});
         let d = get_ct(2,1,3,4);
         let res = ResultType{positions:0, colors:2};
-        assert_eq!(a.grade(d), res);
-        let line = LineType::new(a, d);
+        assert_eq!(a.grade(&d), res);
+        let line = LineType::new(a, &d);
         assert_eq!(line.result, res);
     }
     
