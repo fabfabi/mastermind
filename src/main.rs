@@ -104,16 +104,10 @@ mod mastermind_io {
         let mut appender = |line: &Vec<u8>| {
             let mut new_line = line.clone();
             new_line.reverse();
-            all_possible_lines.push(CodeType {
-                entries: new_line,
-            });
+            all_possible_lines.push(CodeType { entries: new_line });
         };
         appender(&line);
-        //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
-
-        //let augmentor = <'a+ 'b> :: |line: & 'a mut Vec<u8>, list : &'b Vec<CodeType>|  -> & mut'b Option(Vec<u8>){
-        //let augmentor = |mut line: Vec<u8>|{
-        loop{
+        loop {
             for c in line.iter_mut() {
                 if *c == colors - 1 {
                     *c = 0;
@@ -124,7 +118,7 @@ mod mastermind_io {
             }
             if *line == vec![0u8; columns] {
                 return all_possible_lines;
-            }            //appender(&line);
+            } 
             appender(&line)
         }
     }
@@ -191,20 +185,21 @@ mod mastermind_io {
     }
 
     #[test]
-    fn test_all_combinations(){
-        let config = ConfigType{columns:4, colors:6};
+    fn test_all_combinations() {
+        let config = ConfigType {
+            columns: 4,
+            colors: 6,
+        };
 
         let ac = get_all_codes(&config);
 
-        assert_eq!(ac.len(), usize::from(6_u16.pow(4) ));
+        assert_eq!(ac.len(), usize::from(6_u16.pow(4)));
 
         /* println!("entries: {}", ac.len());
         for row in ac{
             println!("{:?}", row);
         }
         assert!(false) */
-
-
     }
 }
 
