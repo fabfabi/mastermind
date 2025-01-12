@@ -2,11 +2,14 @@
 //const COLORS: u8 = 6;
 //const TOTAL_COMBINATIONS: u64 =
 mod mastermind_io {
-    struct ConfigType {
+
+    ///Structure to store the configuration, i.e. number of columns an colors
+    pub struct ConfigType {
         columns: usize,
         colors: u8,
     }
 
+    ///Structure to store the result
     #[derive(PartialEq, Debug)]
     //#[derive(Copy, Clone, PartialEq, Debug)]
     struct ResultType {
@@ -14,8 +17,15 @@ mod mastermind_io {
         colors: u8,
     }
 
-    #[derive(Copy, Clone)]
-    struct CodeType {
+    impl ResultType {
+        /// check if the solution was already found
+        pub fn done(self, configuration: &ConfigType) -> bool {
+            configuration.columns == self.positions.into()
+        }
+    }
+    //#[derive(Copy, Clone)]
+    ///code for one single try
+    pub struct CodeType {
         entries: Vec<u8>, //[u8; COLUMNS],
                           //configuration: &'a ConfigType
     }
@@ -23,58 +33,65 @@ mod mastermind_io {
         pub fn new(entries: Vec<u8>) -> Self {
             Self { entries }
         }
-        fn grade(self: CodeType, solution: &CodeType) -> ResultType {
-            //const length: usize = 4; //&configuration.columns;
-            let length: usize = self.entries.len(); //&self.configuration.columns;
-            if length != solution.entries.len() {
-                panic!("Solution does not fit to entries")
-            }
-
-            //COLUMNS = self.config.columns;
-            let mut line_bool = vec![false; length];
-            let mut solution_bool = vec![false; length];
-            let mut positions: u8 = 0;
-            let mut colors: u8 = 0;
-
-            for i in 0..length {
-                if self.entries[i] == solution.entries[i] {
-                    positions += 1;
-                    line_bool[i] = true;
-                    solution_bool[i] = true;
-                }
-            }
-
-            for i in 0..length {
-                if line_bool[i] {
-                    continue;
-                }
-                for j in 0..length {
-                    if solution_bool[j] {
-                        continue;
-                    } else if self.entries[i] == solution.entries[j] {
-                        line_bool[i] = true;
-                        solution_bool[j] = true;
-                        colors += 1;
-                        break;
-                    }
-                }
-            }
-            ResultType { positions, colors }
+    }
+    ///grade a code wrt a solution
+    fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
+        //const length: usize = 4; //&configuration.columns;
+        let length: usize = guess.entries.len(); //&self.configuration.columns;
+        if length != solution.entries.len() {
+            panic!("Solution does not fit to entries")
         }
+
+        //COLUMNS = self.config.columns;
+        let mut line_bool = vec![false; length];
+        let mut solution_bool = vec![false; length];
+        let mut positions: u8 = 0;
+        let mut colors: u8 = 0;
+
+        for i in 0..length {
+            if guess.entries[i] == solution.entries[i] {
+                positions += 1;
+                line_bool[i] = true;
+                solution_bool[i] = true;
+            }
+        }
+
+        for i in 0..length {
+            if line_bool[i] {
+                continue;
+            }
+            for j in 0..length {
+                if solution_bool[j] {
+                    continue;
+                } else if guess.entries[i] == solution.entries[j] {
+                    line_bool[i] = true;
+                    solution_bool[j] = true;
+                    colors += 1;
+                    break;
+                }
+            }
+        }
+        ResultType { positions, colors }
     }
 
+    ///Line containing a code and the result
     //#[derive(Copy, Clone)]
-    struct LineType {
+    pub struct LineType {
         code: CodeType,
         result: ResultType,
     }
     impl LineType {
         fn new(new_line: CodeType, solution: &CodeType) -> LineType {
-            let result = new_line.grade(solution);
+            let result = grade(&new_line, &solution);
             return LineType {
                 code: new_line,
                 result: result,
             };
+        }
+
+        ///was the solution found already?
+        fn done(self, configuration: &ConfigType) -> bool {
+            return self.result.done(&configuration);
         }
     }
 
@@ -102,49 +119,48 @@ mod mastermind_io {
 
         return all_possible_lines;
     } */
-}
-fn main() {
-    println!("Hello, world!");
-}
-
-#[cfg(test)]
-mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
-    use super::*;
-
     #[test]
-    fn test_code_type() {
-        fn get_ct(a: u8, b: u8, c: u8, ref_number: u8) -> CodeType {
-            let mut line = [ref_number; COLUMNS];
-            line[0] = a;
-            line[1] = b;
-            line[2] = c;
-            return CodeType { entries: line };
-        }
-        let a = get_ct(1, 2, 2, 0);
-        let b = get_ct(1, 3, 3, 4);
+    fn test_basics() {
+        let a = CodeType::new(vec![1,2,2,0]);
+        let b_raw = CodeType::new(vec![1,3,3,4]);
+        let b = LineType::new(b_raw, &a);
         assert_eq!(
-            b.grade(&a),
+            b.result,
             ResultType {
                 positions: 1,
                 colors: 0
             }
         );
-        let c = get_ct(9, 9, 9, 9);
+
+        let c_raw = CodeType::new(vec![9, 9, 9, 9]);
+        let c = LineType::new(c_raw, &a);
         assert_eq!(
-            c.grade(&a),
+            c.result,
             ResultType {
                 positions: 0,
                 colors: 0
             }
         );
-        let d = get_ct(2, 1, 3, 4);
+        let d_raw = CodeType::new(vec![2,1,3,4]);
+        let d = LineType::new(d_raw, &a);
+
         let res = ResultType {
             positions: 0,
             colors: 2,
         };
-        assert_eq!(a.grade(&d), res);
-        let line = LineType::new(a, &d);
-        assert_eq!(line.result, res);
+        assert_eq!(d.result, res);
+
+        let configuration = ConfigType{colors:6, columns:4, };
+
+        let f_raw = CodeType::new(vec![1,2,2,0]);
+        let f = LineType::new(f_raw, &a);
+        assert!(f.done(&configuration));
+
+
     }
 }
+
+fn main() {
+    println!("Hello, world!");
+}
+
