@@ -98,19 +98,22 @@ mod mastermind_io {
         let columns = configuration.columns;
         let colors = configuration.colors;
 
-        let mut line = vec![0u8; columns];
+        let initial_line = vec![0u8; columns];
+        let mut line = initial_line.clone();
         let mut all_possible_lines: Vec<CodeType> = Vec::new();
         let mut appender = |line: &Vec<u8>| {
+            let mut new_line = line.clone();
+            new_line.reverse();
             all_possible_lines.push(CodeType {
-                entries: line.clone(),
+                entries: new_line,
             });
         };
         appender(&line);
         //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
 
         //let augmentor = <'a+ 'b> :: |line: & 'a mut Vec<u8>, list : &'b Vec<CodeType>|  -> & mut'b Option(Vec<u8>){
-        let augmentor = |mut line: Vec<u8>|{
-        
+        //let augmentor = |mut line: Vec<u8>|{
+        loop{
             for c in line.iter_mut() {
                 if *c == colors - 1 {
                     *c = 0;
@@ -119,22 +122,11 @@ mod mastermind_io {
                     break;
                 }
             }
-             /* if *line == vec![0u8; columns] {
-                return None;
+            if *line == vec![0u8; columns] {
+                return all_possible_lines;
             }            //appender(&line);
-            Some(line)  */
-            line
-        };
-        /* loop {
-            //line_out = augmentor(line);
-            match augmentor(&line) {
-                Some(x) => appender(x),
-                Option(None) => return all_possible_lines,
-            }
-        } */
-       let new_line = augmentor(line);
-       appender(&new_line);
-       all_possible_lines
+            appender(&line)
+        }
     }
     #[test]
     fn test_basics() {
@@ -203,11 +195,14 @@ mod mastermind_io {
         let config = ConfigType{columns:4, colors:6};
 
         let ac = get_all_codes(&config);
-        println!("entries: {}", ac.len());
+
+        assert_eq!(ac.len(), usize::from(6_u16.pow(4) ));
+
+        /* println!("entries: {}", ac.len());
         for row in ac{
             println!("{:?}", row);
         }
-        assert!(false)
+        assert!(false) */
 
 
     }
