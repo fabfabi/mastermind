@@ -1,4 +1,3 @@
-test.jl
 *.txt
-rust/target/*
+target/*
 *Cargo.lock
