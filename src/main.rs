@@ -1,92 +1,108 @@
-const COLUMNS: usize = 4;
-const COLORS: u8 = 6;
+//const COLUMNS: usize = 4;
+//const COLORS: u8 = 6;
 //const TOTAL_COMBINATIONS: u64 =
+mod mastermind_io {
+    struct ConfigType {
+        columns: usize,
+        colors: u8,
+    }
 
-#[derive(Copy, Clone)]
-struct CodeType {
-    entries: [u8; COLUMNS],
-}
-impl CodeType {
-    fn grade(self: CodeType, solution: &CodeType) -> ResultType {
-        let mut line_bool = [false; COLUMNS];
-        let mut solution_bool = [false; COLUMNS];
-        let mut positions: u8 = 0;
-        let mut colors: u8 = 0;
+    #[derive(PartialEq, Debug)]
+    //#[derive(Copy, Clone, PartialEq, Debug)]
+    struct ResultType {
+        positions: u8,
+        colors: u8,
+    }
 
-        for i in 0..COLUMNS {
-            if self.entries[i] == solution.entries[i] {
-                positions += 1;
-                line_bool[i] = true;
-                solution_bool[i] = true;
-            }
+    #[derive(Copy, Clone)]
+    struct CodeType {
+        entries: Vec<u8>, //[u8; COLUMNS],
+                          //configuration: &'a ConfigType
+    }
+    impl CodeType {
+        pub fn new(entries: Vec<u8>) -> Self {
+            Self { entries }
         }
-
-        for i in 0..COLUMNS {
-            if line_bool[i] {
-                continue;
+        fn grade(self: CodeType, solution: &CodeType) -> ResultType {
+            //const length: usize = 4; //&configuration.columns;
+            let length: usize = self.entries.len(); //&self.configuration.columns;
+            if length != solution.entries.len() {
+                panic!("Solution does not fit to entries")
             }
-            for j in 0..COLUMNS {
-                if solution_bool[j] {
-                    continue;
-                } else if self.entries[i] == solution.entries[j] {
+
+            //COLUMNS = self.config.columns;
+            let mut line_bool = vec![false; length];
+            let mut solution_bool = vec![false; length];
+            let mut positions: u8 = 0;
+            let mut colors: u8 = 0;
+
+            for i in 0..length {
+                if self.entries[i] == solution.entries[i] {
+                    positions += 1;
                     line_bool[i] = true;
-                    solution_bool[j] = true;
-                    colors += 1;
-                    break;
+                    solution_bool[i] = true;
+                }
+            }
+
+            for i in 0..length {
+                if line_bool[i] {
+                    continue;
+                }
+                for j in 0..length {
+                    if solution_bool[j] {
+                        continue;
+                    } else if self.entries[i] == solution.entries[j] {
+                        line_bool[i] = true;
+                        solution_bool[j] = true;
+                        colors += 1;
+                        break;
+                    }
+                }
+            }
+            ResultType { positions, colors }
+        }
+    }
+
+    //#[derive(Copy, Clone)]
+    struct LineType {
+        code: CodeType,
+        result: ResultType,
+    }
+    impl LineType {
+        fn new(new_line: CodeType, solution: &CodeType) -> LineType {
+            let result = new_line.grade(solution);
+            return LineType {
+                code: new_line,
+                result: result,
+            };
+        }
+    }
+
+    /* fn get_all_codes() -> Vec<CodeType> {
+        let mut line = [0u8; COLUMNS];
+        let mut all_possible_lines: Vec<CodeType> = Vec::new();
+        all_possible_lines.push(CodeType { entries: line });
+        //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
+
+        fn augment(line: &mut [u8; COLUMNS], index: usize) -> Result<[u8; COLUMNS], &'static str> {
+            if index == -1 {
+                Err("All combinations found")
+            } else if line[index] == (COLORS - 1) {
+                line[index] = 0;
+                augment(line, index - 1)
+            } else {
+                {
+                    line[index] += 1
                 }
             }
         }
-        ResultType { positions, colors }
-    }
-}
 
-#[derive(PartialEq, Debug)]
-//#[derive(Copy, Clone, PartialEq, Debug)]
-struct ResultType {
-    positions: u8,
-    colors: u8,
-}
-
-//#[derive(Copy, Clone)]
-struct LineType {
-    code: CodeType,
-    result: ResultType,
-}
-impl LineType {
-    fn new(new_line: CodeType, solution: &CodeType) -> LineType {
-        let result = new_line.grade(solution);
-        return LineType {
-            code: new_line,
-            result: result,
-        };
-    }
-}
-
-/* fn get_all_codes() -> Vec<CodeType> {
-    let mut line = [0u8; COLUMNS];
-    let mut all_possible_lines: Vec<CodeType> = Vec::new();
-    all_possible_lines.push(CodeType { entries: line });
-    //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
-
-    fn augment(line: &mut [u8; COLUMNS], index: usize) -> Result<[u8; COLUMNS], &'static str> {
-        if index == -1 {
-            Err("All combinations found")
-        } else if line[index] == (COLORS - 1) {
-            line[index] = 0;
-            augment(line, index - 1)
-        } else {
-            {
-                line[index] += 1
-            }
+        for i in 1..5 { //num_combinations{
         }
-    }
 
-    for i in 1..5 { //num_combinations{
-    }
-
-    return all_possible_lines;
-} */
-
+        return all_possible_lines;
+    } */
+}
 fn main() {
     println!("Hello, world!");
 }
@@ -97,7 +113,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_CodeType() {
+    fn test_code_type() {
         fn get_ct(a: u8, b: u8, c: u8, ref_number: u8) -> CodeType {
             let mut line = [ref_number; COLUMNS];
             line[0] = a;
