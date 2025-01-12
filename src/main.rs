@@ -1,6 +1,4 @@
-//const COLUMNS: usize = 4;
-//const COLORS: u8 = 6;
-//const TOTAL_COMBINATIONS: u64 =
+/// basic module for io functions
 mod mastermind_io {
 
     ///Structure to store the configuration, i.e. number of columns an colors
@@ -121,8 +119,8 @@ mod mastermind_io {
     } */
     #[test]
     fn test_basics() {
-        let a = CodeType::new(vec![1,2,2,0]);
-        let b_raw = CodeType::new(vec![1,3,3,4]);
+        let a = CodeType::new(vec![1, 2, 2, 0]);
+        let b_raw = CodeType::new(vec![1, 3, 3, 4]);
         let b = LineType::new(b_raw, &a);
         assert_eq!(
             b.result,
@@ -141,26 +139,47 @@ mod mastermind_io {
                 colors: 0
             }
         );
-        let d_raw = CodeType::new(vec![2,1,3,4]);
+        let d_raw = CodeType::new(vec![2, 1, 3, 4]);
         let d = LineType::new(d_raw, &a);
 
-        let res = ResultType {
-            positions: 0,
-            colors: 2,
+        assert_eq!(
+            d.result,
+            ResultType {
+                positions: 0,
+                colors: 2,
+            }
+        );
+
+        let configuration = ConfigType {
+            colors: 6,
+            columns: 4,
         };
-        assert_eq!(d.result, res);
 
-        let configuration = ConfigType{colors:6, columns:4, };
+        //d is not done
+        assert!(!d.done(&configuration));
 
-        let f_raw = CodeType::new(vec![1,2,2,0]);
+        let f_raw = CodeType::new(vec![1, 2, 2, 0]);
         let f = LineType::new(f_raw, &a);
+        // f is done
+        assert_eq!(
+            f.result,
+            ResultType {
+                positions: 4,
+                colors: 0,
+            }
+        );
         assert!(f.done(&configuration));
+    }
 
-
+    #[test]
+    #[should_panic]
+    fn test_wrong_input() {
+        let a = CodeType::new(vec![1, 2, 2, 0]);
+        let b_raw = CodeType::new(vec![1, 3, 3, 4, 5]);
+        let b = LineType::new(b_raw, &a);
     }
 }
 
 fn main() {
     println!("Hello, world!");
 }
-
