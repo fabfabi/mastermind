@@ -22,6 +22,7 @@ mod mastermind_io {
         }
     }
     //#[derive(Copy, Clone)]
+    #[derive(Debug)]
     ///code for one single try
     pub struct CodeType {
         entries: Vec<u8>, //[u8; COLUMNS],
@@ -104,10 +105,11 @@ mod mastermind_io {
                 entries: line.clone(),
             });
         };
+        appender(&line);
         //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
 
         //let augmentor = <'a+ 'b> :: |line: & 'a mut Vec<u8>, list : &'b Vec<CodeType>|  -> & mut'b Option(Vec<u8>){
-        let augmentor = |line: & mut Vec<u8>, list : & Vec<CodeType>|{
+        let augmentor = |mut line: Vec<u8>|{
         
             for c in line.iter_mut() {
                 if *c == colors - 1 {
@@ -117,18 +119,22 @@ mod mastermind_io {
                     break;
                 }
             }
-            if *line == vec![0u8; columns] {
+             /* if *line == vec![0u8; columns] {
                 return None;
-            }
-            //appender(&line);
-            Some(line)
+            }            //appender(&line);
+            Some(line)  */
+            line
         };
-        loop {
-            match augmentor(&mut line, &all_possible_lines) {
+        /* loop {
+            //line_out = augmentor(line);
+            match augmentor(&line) {
                 Some(x) => appender(x),
-                None => return all_possible_lines,
+                Option(None) => return all_possible_lines,
             }
-        }
+        } */
+       let new_line = augmentor(line);
+       appender(&new_line);
+       all_possible_lines
     }
     #[test]
     fn test_basics() {
@@ -189,7 +195,21 @@ mod mastermind_io {
     fn test_wrong_input() {
         let a = CodeType::new(vec![1, 2, 2, 0]);
         let b_raw = CodeType::new(vec![1, 3, 3, 4, 5]);
-        let b = LineType::new(b_raw, &a);
+        let _b = LineType::new(b_raw, &a);
+    }
+
+    #[test]
+    fn test_all_combinations(){
+        let config = ConfigType{columns:4, colors:6};
+
+        let ac = get_all_codes(&config);
+        println!("entries: {}", ac.len());
+        for row in ac{
+            println!("{:?}", row);
+        }
+        assert!(false)
+
+
     }
 }
 
