@@ -93,30 +93,43 @@ mod mastermind_io {
         }
     }
 
-    /* fn get_all_codes() -> Vec<CodeType> {
-        let mut line = [0u8; COLUMNS];
+    fn get_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
+        let columns = configuration.columns;
+        let colors = configuration.colors;
+
+        let mut line = vec![0u8; columns];
         let mut all_possible_lines: Vec<CodeType> = Vec::new();
-        all_possible_lines.push(CodeType { entries: line });
+        let mut appender = |line: &Vec<u8>| {
+            all_possible_lines.push(CodeType {
+                entries: line.clone(),
+            });
+        };
         //let num_combinations: u64 = u64::from(COLUMNS).pow(COLORS);
 
-        fn augment(line: &mut [u8; COLUMNS], index: usize) -> Result<[u8; COLUMNS], &'static str> {
-            if index == -1 {
-                Err("All combinations found")
-            } else if line[index] == (COLORS - 1) {
-                line[index] = 0;
-                augment(line, index - 1)
-            } else {
-                {
-                    line[index] += 1
+        //let augmentor = <'a+ 'b> :: |line: & 'a mut Vec<u8>, list : &'b Vec<CodeType>|  -> & mut'b Option(Vec<u8>){
+        let augmentor = |line: & mut Vec<u8>, list : & Vec<CodeType>|{
+        
+            for c in line.iter_mut() {
+                if *c == colors - 1 {
+                    *c = 0;
+                } else {
+                    *c += 1;
+                    break;
                 }
             }
+            if *line == vec![0u8; columns] {
+                return None;
+            }
+            //appender(&line);
+            Some(line)
+        };
+        loop {
+            match augmentor(&mut line, &all_possible_lines) {
+                Some(x) => appender(x),
+                None => return all_possible_lines,
+            }
         }
-
-        for i in 1..5 { //num_combinations{
-        }
-
-        return all_possible_lines;
-    } */
+    }
     #[test]
     fn test_basics() {
         let a = CodeType::new(vec![1, 2, 2, 0]);
