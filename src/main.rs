@@ -1,5 +1,7 @@
 /// basic module for io functions
-mod mastermind_io {
+mod mastermind_mechanics {
+
+    use rand::Rng;
 
     ///Structure to store the configuration, i.e. number of columns an colors
     pub struct ConfigType {
@@ -73,6 +75,15 @@ mod mastermind_io {
         ResultType { positions, colors }
     }
 
+    /// Random code generator
+    pub fn generate_code(configuration: &ConfigType) -> CodeType {
+        let mut raw_code = Vec::new();
+        for _ in 0..configuration.columns {
+            raw_code.push(rand::thread_rng().gen_range(0..configuration.colors));
+        }
+        CodeType::new(raw_code)
+    }
+
     ///Line containing a code and the result
     //#[derive(Copy, Clone)]
     pub struct LineType {
@@ -94,7 +105,7 @@ mod mastermind_io {
         }
     }
 
-    fn get_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
+    pub fn get_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
         let columns = configuration.columns;
         let colors = configuration.colors;
 
@@ -118,7 +129,7 @@ mod mastermind_io {
             }
             if *line == vec![0u8; columns] {
                 return all_possible_lines;
-            } 
+            }
             appender(&line)
         }
     }
