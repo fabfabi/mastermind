@@ -1,4 +1,4 @@
-/// basic module for io functions
+/// module for basic functions around handling and grading the guesses
 mod mastermind_mechanics {
 
     use rand::Rng;
@@ -47,7 +47,7 @@ mod mastermind_mechanics {
             }
             return Ok(Self::new(entries));
         }
-        ///equals
+        ///equals a vector of other_entries
         pub fn eq(self, other_entries: Vec<u8>) -> bool {
             return self.entries == other_entries;
         }
@@ -82,7 +82,7 @@ mod mastermind_mechanics {
         //no input
         assert!(CodeType::new_check(Vec::new(), &config).is_err());
     }
-    ///grade a code wrt a solution
+    ///grade a guess wrt a solution
     fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
         //const length: usize = 4; //&configuration.columns;
         let length: usize = guess.entries.len(); //&self.configuration.columns;
@@ -181,7 +181,6 @@ mod mastermind_mechanics {
         }
     }
 
-    use std::char::DecodeUtf16Error;
     use std::error;
     use std::fmt;
     ///define custom Error Message
@@ -297,11 +296,9 @@ mod mastermind_mechanics {
     }
 }
 
+///module for io functions
 mod mastermind_io {
     use crate::mastermind_mechanics as mm;
-    use regex::Regex;
-    //use std::io::{self, BufRead};
-    //use std::num::ParseIntError;
     use text_io::read;
 
     fn enter_code() -> Result<String, text_io::Error> {
@@ -345,21 +342,8 @@ mod mastermind_io {
         let result = read_code(input, &config);
         assert!(matches!(result, Err(mm::CodeTypeError::DecodingError)))
     }
-
-    fn _get_code(reader_function: fn() -> Result<mm::CodeType, mm::CodeTypeError>) -> mm::CodeType {
-        loop {
-            let resulting_row = reader_function();
-            if let Ok(line) = resulting_row {
-                return line;
-            }
-        }
-    }
     /// read the user input and convert it to a valid CodeType
     pub fn get_code(configuration: &mm::ConfigType) -> mm::CodeType {
-        /* fn reader_function() -> Result<mm::CodeType, mm::CodeTypeError> {
-            return read_code(enter_code(), &configuration);
-        } */
-
         loop {
             let resulting_row = read_code(enter_code(), &configuration);
             if let Ok(line) = resulting_row {
