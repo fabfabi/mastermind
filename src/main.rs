@@ -34,6 +34,48 @@ mod mastermind_mechanics {
         pub fn new(entries: Vec<u8>) -> Self {
             Self { entries }
         }
+        pub fn new_check(
+            entries: Vec<u8>,
+            configuration: &ConfigType,
+        ) -> Result<Self, CodeTypeError> {
+            if entries.len() != configuration.columns {
+                return Err(CodeTypeError::ColumnMismatch);
+            } else if *entries.iter().max_by_key(|x| *x).unwrap() >= configuration.colors {
+                return Err(CodeTypeError::ColorMismatch);
+            }
+            return Ok(Self::new(entries));
+        }
+        pub fn assert_eq(self, other_entries: Vec<u8>) -> bool {
+            return self.entries == other_entries;
+        }
+    }
+    #[test]
+    fn test_newCodeType_check() {
+        let config = ConfigType {
+            columns: 4,
+            colors: 6,
+        };
+
+        assert_eq!(
+            CodeType::new_check(vec![1, 2, 3, 4], &config)
+                .unwrap()
+                .entries,
+            vec![1, 2, 3, 4]
+        );
+
+        assert_eq!(
+            // this notation works. It could be refactored to get rid of the ::new method?! -> tbc if entries need to be pub
+            CodeType {
+                entries: vec![1, 2, 3, 4]
+            }
+            .entries,
+            vec![1, 2, 3, 4]
+        );
+
+        // wrong number of columns should error
+        assert!(CodeType::new_check(vec![1, 2, 3], &config).is_err());
+        //wrong columns should error
+        assert!(CodeType::new_check(vec![1, 2, 3, 6], &config).is_err());
     }
     ///grade a code wrt a solution
     fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
@@ -133,6 +175,42 @@ mod mastermind_mechanics {
             appender(&line)
         }
     }
+
+    use std::char::DecodeUtf16Error;
+    use std::error;
+    use std::fmt;
+    ///define custom Error Message
+    #[derive(Debug, Clone)]
+    pub enum CodeTypeError {
+        ColumnMismatch,
+        ColorMismatch,
+        DecodingError,
+    }
+    impl fmt::Display for CodeTypeError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match *self {
+                Self::ColumnMismatch => {
+                    write!(f, "Wrong columns defined")
+                }
+                Self::ColorMismatch => {
+                    write!(f, "the provided the input has wrong colors")
+                }
+                Self::DecodingError => {
+                    write!(f, "Error in decoding the input")
+                }
+            }
+        }
+    }
+    impl error::Error for CodeTypeError {
+        fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+            None
+            /* match *self {
+                CodeTypeError::ColumnMismatch => None,
+                CodeTypeError::ColorMismatch => None,
+            } */
+        }
+    }
+
     #[test]
     fn test_basics() {
         let a = CodeType::new(vec![1, 2, 2, 0]);
@@ -217,8 +295,8 @@ mod mastermind_mechanics {
 mod mastermind_io {
     use crate::mastermind_mechanics as mm;
     use regex::Regex;
-    use std::io::{self, BufRead};
-    use std::num::ParseIntError;
+    //use std::io::{self, BufRead};
+    //use std::num::ParseIntError;
     use text_io::read;
 
     fn enter_code() -> Result<String, text_io::Error> {
@@ -226,38 +304,112 @@ mod mastermind_io {
         Ok(line)
     }
 
+    ///convert a string format to a CodeType including error handling
     fn read_code(
         result: Result<String, text_io::Error>,
         configuration: &mm::ConfigType,
-    ) -> Result<mm::CodeType, Err()> {
+    ) -> Result<mm::CodeType, mm::CodeTypeError> {
+        /*
         let re = Regex::new(r"[0-9]").unwrap();
-        let text = result.unwrap_or_else(|_| String::from("0"));
-        let results: Vec<&str> = re.find_iter(&text).map(|m| m.as_str()).collect();
-        if results.len() != configuration.columns {
-            Err("wrong numbers of columns. Expected configuration.columns but received results.len()")
-        }
 
-        Ok(mm::CodeType::new(vec![1, 2, 3]))
+        let results_str_vec: Vec<&str>;
+
+        if let Ok(text) = result {
+            results_str_vec = re.find_iter(text).map(|m| m.as_str()).collect();
+        } else {
+            results_str_vec = Vec::new();
+            return Err(mm::CodeTypeError::DecodingError);
+        } */
+        /* let results_num: Vec<char>;
+
+        if let Ok(text) = result {
+            //: Vec<char> = input
+            results_num = text
+                .chars()
+                .filter(|&c| "0123456789".contains(c))
+                .map(|d| d as u8)
+                .collect();
+        } else {
+            return Err(mm::CodeTypeError::DecodingError);
+        } */
+        let results_num: Vec<u8> = match result {
+            Ok(text) => text
+                .chars()
+                .filter(|&c| "0123456789".contains(c)) // Filter digits
+                .filter_map(|c| c.to_digit(10)) // Convert each character to a digit (u32)
+                .map(|d| d as u8) // Convert u32 to u8
+                .collect(), // Collect into a Vec<u8>
+            Err(_) => return Err(mm::CodeTypeError::DecodingError), // Return an empty Vec if Result is Err
+        };
+
+        /*      let results_num: Vec<u8> = results_str_vec
+        .iter()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().unwrap())
+        .collect(); */
+
+        return mm::CodeType::new_check(results_num, &configuration);
     }
 
-    fn _get_code(reader_function: fn() -> Result<mm::CodeType, Err()>) -> mm::CodeType {
+    fn test_read_code() {
+        let config = mm::ConfigType {
+            columns: 4,
+            colors: 6,
+        };
+
+        assert!(read_code(Ok(String::new("1234")), &config)
+            .unwrap()
+            .assert_eq(vec![1, 2, 3, 4]))
+    }
+
+    fn _get_code(reader_function: fn() -> Result<mm::CodeType, mm::CodeTypeError>) -> mm::CodeType {
         loop {
             let resulting_row = reader_function();
-            if let Some(line) = resulting_row {
+            if let Ok(line) = resulting_row {
+                return line;
+            }
+        }
+    }
+    /// read the user input and convert it to a valid CodeType
+    pub fn get_code(configuration: &mm::ConfigType) -> mm::CodeType {
+        /* fn reader_function() -> Result<mm::CodeType, mm::CodeTypeError> {
+            return read_code(enter_code(), &configuration);
+        } */
+
+        loop {
+            let resulting_row = read_code(enter_code(), &configuration);
+            if let Ok(line) = resulting_row {
                 return line;
             }
         }
     }
 
-    pub fn get_code(configuration: &mm::ConfigType) -> mm::CodeType {
-        let reader_function = || read_code(enter_code(), &configuration);
-        _get_code(reader_function)
-        //mm::CodeType::new(vec![1, 2, 3, 4])
-    }
-
+    #[test]
     fn test_enter_code() {}
 }
 
+mod testing {
+
+    fn lifetime_check(variable: &i64) -> i64 {
+        let return_value: i64 = 50;
+
+        return return_value;
+    }
+    #[test]
+    fn test_lifetime_check() {
+        assert_eq!(lifetime_check(&10), 50)
+    }
+    #[test]
+    fn test_vectors() {
+        let string_vec = vec!["1", "2", "3"];
+        let translation: Vec<u8> = string_vec
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().unwrap())
+            .collect();
+        assert_eq!(translation, vec![1, 2, 3])
+    }
+}
 fn main() {
     println!("Hello, world!");
 }
