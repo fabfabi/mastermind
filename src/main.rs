@@ -330,7 +330,7 @@ mod mastermind_io {
         let results_num: Vec<u8> = match result {
             Ok(text) => text
                 .chars()
-                .filter(|&c| "0123456789".contains(c)) // Filter digits
+                //.filter(|&c| "0123456789".contains(c)) // Filter digits -> not needed due tofilter_map
                 .filter_map(|c| c.to_digit(10)) // Convert each character to a digit (u32)
                 .map(|d| d as u8) // Convert u32 to u8
                 .collect(), // Collect into a Vec<u8>
@@ -349,6 +349,11 @@ mod mastermind_io {
 
         // test the easy case
         assert!(read_code(Ok("1234".to_string()), &config)
+            .unwrap()
+            .eq(vec![1, 2, 3, 4]));
+
+        // test the other case
+        assert!(read_code(Ok("12d f3, oiuf4f lksjf".to_string()), &config)
             .unwrap()
             .eq(vec![1, 2, 3, 4]));
 
