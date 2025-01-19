@@ -31,9 +31,11 @@ mod mastermind_mechanics {
                           //configuration: &'a ConfigType
     }
     impl CodeType {
+        ///new WITHOUT any check
         pub fn new(entries: Vec<u8>) -> Self {
             Self { entries }
         }
+        ///new with a check wrt to given config
         pub fn new_check(
             entries: Vec<u8>,
             configuration: &ConfigType,
@@ -45,7 +47,8 @@ mod mastermind_mechanics {
             }
             return Ok(Self::new(entries));
         }
-        pub fn assert_eq(self, other_entries: Vec<u8>) -> bool {
+        ///equals
+        pub fn eq(self, other_entries: Vec<u8>) -> bool {
             return self.entries == other_entries;
         }
     }
@@ -76,6 +79,8 @@ mod mastermind_mechanics {
         assert!(CodeType::new_check(vec![1, 2, 3], &config).is_err());
         //wrong columns should error
         assert!(CodeType::new_check(vec![1, 2, 3, 6], &config).is_err());
+        //no input
+        assert!(CodeType::new_check(Vec::new(), &config).is_err());
     }
     ///grade a code wrt a solution
     fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
@@ -309,29 +314,6 @@ mod mastermind_io {
         result: Result<String, text_io::Error>,
         configuration: &mm::ConfigType,
     ) -> Result<mm::CodeType, mm::CodeTypeError> {
-        /*
-        let re = Regex::new(r"[0-9]").unwrap();
-
-        let results_str_vec: Vec<&str>;
-
-        if let Ok(text) = result {
-            results_str_vec = re.find_iter(text).map(|m| m.as_str()).collect();
-        } else {
-            results_str_vec = Vec::new();
-            return Err(mm::CodeTypeError::DecodingError);
-        } */
-        /* let results_num: Vec<char>;
-
-        if let Ok(text) = result {
-            //: Vec<char> = input
-            results_num = text
-                .chars()
-                .filter(|&c| "0123456789".contains(c))
-                .map(|d| d as u8)
-                .collect();
-        } else {
-            return Err(mm::CodeTypeError::DecodingError);
-        } */
         let results_num: Vec<u8> = match result {
             Ok(text) => text
                 .chars()
@@ -342,24 +324,26 @@ mod mastermind_io {
             Err(_) => return Err(mm::CodeTypeError::DecodingError), // Return an empty Vec if Result is Err
         };
 
-        /*      let results_num: Vec<u8> = results_str_vec
-        .iter()
-        .filter(|s| !s.is_empty())
-        .map(|s| s.parse().unwrap())
-        .collect(); */
-
         return mm::CodeType::new_check(results_num, &configuration);
     }
 
+    #[test]
     fn test_read_code() {
         let config = mm::ConfigType {
             columns: 4,
             colors: 6,
         };
 
-        assert!(read_code(Ok(String::new("1234")), &config)
+        // test the easy case
+        assert!(read_code(Ok("1234".to_string()), &config)
             .unwrap()
-            .assert_eq(vec![1, 2, 3, 4]))
+            .eq(vec![1, 2, 3, 4]));
+
+        //note: errors with incomplete columns/wrong colors are covered by CodeType::new_check
+
+        let input: Result<String, text_io::Error> = Err(text_io::Error::MissingMatch);
+        let result = read_code(input, &config);
+        assert!(matches!(result, Err(mm::CodeTypeError::DecodingError)))
     }
 
     fn _get_code(reader_function: fn() -> Result<mm::CodeType, mm::CodeTypeError>) -> mm::CodeType {
