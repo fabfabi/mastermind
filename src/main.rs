@@ -5,8 +5,8 @@ mod mastermind_mechanics {
 
     ///Structure to store the configuration, i.e. number of columns an colors
     pub struct ConfigType {
-        columns: usize,
-        colors: u8,
+        pub columns: usize,
+        pub colors: u8,
     }
 
     ///Structure to store the result
@@ -212,6 +212,50 @@ mod mastermind_mechanics {
         }
         assert!(false) */
     }
+}
+
+mod mastermind_io {
+    use crate::mastermind_mechanics as mm;
+    use regex::Regex;
+    use std::io::{self, BufRead};
+    use std::num::ParseIntError;
+    use text_io::read;
+
+    fn enter_code() -> Result<String, text_io::Error> {
+        let line: String = read!("{}\n");
+        Ok(line)
+    }
+
+    fn read_code(
+        result: Result<String, text_io::Error>,
+        configuration: &mm::ConfigType,
+    ) -> Result<mm::CodeType, Err()> {
+        let re = Regex::new(r"[0-9]").unwrap();
+        let text = result.unwrap_or_else(|_| String::from("0"));
+        let results: Vec<&str> = re.find_iter(&text).map(|m| m.as_str()).collect();
+        if results.len() != configuration.columns {
+            Err("wrong numbers of columns. Expected configuration.columns but received results.len()")
+        }
+
+        Ok(mm::CodeType::new(vec![1, 2, 3]))
+    }
+
+    fn _get_code(reader_function: fn() -> Result<mm::CodeType, Err()>) -> mm::CodeType {
+        loop {
+            let resulting_row = reader_function();
+            if let Some(line) = resulting_row {
+                return line;
+            }
+        }
+    }
+
+    pub fn get_code(configuration: &mm::ConfigType) -> mm::CodeType {
+        let reader_function = || read_code(enter_code(), &configuration);
+        _get_code(reader_function)
+        //mm::CodeType::new(vec![1, 2, 3, 4])
+    }
+
+    fn test_enter_code() {}
 }
 
 fn main() {
