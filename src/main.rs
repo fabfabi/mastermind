@@ -15,24 +15,29 @@ mod mastermind_mechanics {
     }
 
     ///Structure to store the result
-    #[derive(PartialEq, Debug)]
-    //#[derive(Copy, Clone, PartialEq, Debug)]
-    struct ResultType {
+    #[derive(PartialEq, Debug, Copy, Clone, Hash, Eq)]
+    pub struct ResultType {
         positions: u8,
         colors: u8,
     }
 
     impl ResultType {
+        ///create a new element
+        pub fn new(positions: u8, colors: u8) -> Self {
+            return Self {
+                positions: positions,
+                colors: colors,
+            };
+        }
         /// check if the solution was already found
         pub fn done(&self, configuration: &ConfigType) -> bool {
             configuration.columns == self.positions.into()
         }
         fn string(&self) -> String {
-            return f!("P{p}C{c}", p = &self.positions, c = &self.colors);
+            return f!("{p} {c}", p = &self.positions, c = &self.colors);
         }
     }
-    //#[derive(Copy, Clone)]
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     ///code for one single try
     pub struct CodeType {
         entries: Vec<u8>, //[u8; COLUMNS],
@@ -43,6 +48,7 @@ mod mastermind_mechanics {
         pub fn new(entries: Vec<u8>) -> Self {
             Self { entries }
         }
+
         ///new with a check wrt to given config
         pub fn new_check(
             entries: Vec<u8>,
@@ -62,6 +68,11 @@ mod mastermind_mechanics {
 
         pub fn print(&self) {
             println!("{:?}", &self.entries)
+        }
+
+        ///grade with respect to another codeTpye
+        pub fn grade(&self, other: &Self) -> ResultType {
+            return grade(&self, &other);
         }
     }
     #[test]
@@ -95,7 +106,7 @@ mod mastermind_mechanics {
         assert!(CodeType::new_check(Vec::new(), &config).is_err());
     }
     ///grade a guess wrt a solution
-    fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
+    pub fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
         //const length: usize = 4; //&configuration.columns;
         let length: usize = guess.entries.len(); //&self.configuration.columns;
         if length != solution.entries.len() {
@@ -432,7 +443,12 @@ mod mastermind_gameplay {
 }
 
 mod testing {
+    use crate::mastermind_mechanics::grade;
+    use crate::mastermind_mechanics::CodeType;
+    use crate::mastermind_mechanics::ConfigType;
+    use crate::mastermind_mechanics::ResultType;
 
+    use std::collections::HashMap;
     fn lifetime_check(_: &i64) -> i64 {
         let return_value: i64 = 50;
 
@@ -451,6 +467,55 @@ mod testing {
             .map(|s| s.parse().unwrap())
             .collect();
         assert_eq!(translation, vec![1, 2, 3])
+    }
+
+    /// grade a number of guesses wrt a solution and return a hashmap
+    fn get_grade_hashmap<'a, 'b>(
+        guesses: &Vec<CodeType>,
+        solution: &'b CodeType,
+    ) -> HashMap<ResultType, Vec<CodeType>> {
+        let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
+
+        for guess in guesses.iter() {
+            let result = grade(&guess, &solution);
+            map.entry(result)
+                .or_insert_with(|| Vec::<CodeType>::new())
+                .push(guess.clone()); //how would this work without the "clone"?
+        }
+
+        return map;
+    }
+    #[test]
+    fn test_get_grade_hashmap() {
+        let guesses = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![1, 1, 1, 1]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+        ];
+        let configuration = ConfigType {
+            columns: 4,
+            colors: 6,
+        };
+        let solution = CodeType::new(vec![1, 2, 3, 4]);
+        let grade_map = get_grade_hashmap(&guesses, &solution);
+
+        let gm_keys: Vec<&ResultType> = grade_map.keys().collect();
+        assert!(gm_keys.contains(&&ResultType::new(4, 0)));
+        assert!(gm_keys.contains(&&ResultType::new(1, 0)));
+        assert!(!gm_keys.contains(&&ResultType::new(1, 1)));
+        assert_eq!(gm_keys.len(), 2);
+        //let v = grade_map.get(&ResultType::new(1, 0));
+        //assert_eq!(v.len(), 4); // -> complaining that len is private...
+
+        for (key, val) in grade_map.iter() {
+            if key.eq(&ResultType::new(4, 0)) {
+                assert_eq!(val.len(), 1)
+            } else {
+                assert_eq!(val.len(), 4)
+            }
+        }
     }
 }
 fn main() {
