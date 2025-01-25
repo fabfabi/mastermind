@@ -629,6 +629,7 @@ mod mastermind_solver {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
     }
+
     #[test]
     fn test_CandidateHandlerType() {
         let config = ConfigType {
@@ -668,49 +669,82 @@ mod mastermind_solver {
     /// enum to calculate the number of entries for a strategy
     enum StrategyCounter {
         Start,               // for the first node
+        Option,              // several options for how to continue
         Unfinished,          // counting not yet done
         Done { count: i64 }, // this strategy path finished already
         Obsolete,            // This path has more moves than a known path
-        End,                 //this is the last node of the strategy
+        End,                 // this is the last node of the strategy
     }
 
     /// Structure to handle the strategy.
     /// Main Idea for every step:
     ///   * StrategyType handles is responsible for the high-level handling (i.e. creation + iterations)
-    ///   * The StrategyStepType handles all individual Steps (i.e. break-down + counting)
+    ///   * The StrategyOption types handles all different possible options (i.e. identifying how to break-down + counting)
+    ///   * The StrategyStepType handles all individual Steps (i.e. how to break it down / if Result => candidates)
 
-    struct StrategyType<'a> {
+    /*     struct StrategyType<'a> {
         max_level: i8,
-        strategy_memory: Vec<StrategyStepType<'a, 'a>>,
+        strategy_memory: Vec<StrategyOptionType<'a>>,
     }
 
-    /// Structure to handle individual steps of a strategy
-    struct StrategyStepType<'a, 'b> {
+    /// Structure to handle different options for the Strategy
+    /// i.e. one of these steps could be next
+    /// It links to several StrategyStepTypes
+    struct StrategyOptionType<'a> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
-        next_options: HashMap<CodeType, &'a StrategyStepType<'a, 'a>>,
-        configuration: &'b ConfigType,
+        next_options: Vec<StrategyStepType>,
+        configuration: &'a ConfigType,
     }
-    impl StrategyStepType<'_, '_> {
+    impl StrategyOptionType<'_> {
         ///initiate everything -> very first step
-        fn init<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'a, 'c>
-        where
-            'b: 'c,
-        {
-            //let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
-            let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
-            StrategyStepType {
+        fn init<'a>(configuration: &'a ConfigType) -> StrategyStepType<'a> {
+            //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
+            let mut option_list: Vec<CodeType> = Vec::new();
+            StrategyOptionType {
                 counter: StrategyCounter::Start,
                 candidate_handler: CandidateHandlerType::initiate(&configuration),
-                next_options: strategy_hashmap,
+                next_options: option_list,
                 configuration: &configuration,
             }
         }
-        /// find all candidates
-        fn find_candidates(&mut self) {}
+        fn new<'a>(configuration: &'a ConfigType) {}
 
+        fn fill_next_options(&mut self) {}
+    } */
+
+    ///dummy class to start from the bottom
+    struct StrategyOptionType<'a> {
+        refere: &'a CodeType,
+    }
+
+    /// Structure to handle individual steps of a strategy
+    /// i.e. if one code (i.e. step) has been entered,
+    /// all candidates are graded again.
+    /// Note that StrategyOptionType and StrategyStepType are always switching
+    struct StrategyStepType<'b> {
+        counter: StrategyCounter,
+        candidate_handler: CandidateHandlerType,
+        //next_options: HashMap<CodeType, &'a StrategyOptionType<'a>>,
+        configuration: &'b ConfigType,
+    }
+    impl StrategyStepType<'_> {
         /// create a strategy step for the next level
-        fn new() {}
+        fn new<'a, 'b, 'c>(
+            candidates: &'a Vec<CodeType>,
+            configuration: &'b ConfigType,
+        ) -> StrategyStepType<'c>
+        where
+            'b: 'c,
+        {
+            //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
+            StrategyStepType {
+                counter: StrategyCounter::Unfinished,
+                candidate_handler: CandidateHandlerType::new(&candidates, &configuration),
+                //next_options: strategy_hashmap,
+                configuration: &configuration,
+            }
+        }
     }
 }
 
