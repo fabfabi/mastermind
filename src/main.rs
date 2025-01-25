@@ -655,7 +655,7 @@ mod mastermind_solver {
         assert_eq!(cht.len(), 2);
     }
     #[test]
-    fn high_level_check() {
+    fn test_CandidateHandlerType_highlevelcheck() {
         // just check the first level of
         let config = ConfigType {
             colors: 6,
@@ -663,6 +663,54 @@ mod mastermind_solver {
         };
         let cht = CandidateHandlerType::initiate(&config);
         assert_eq!(cht.len(), 5);
+    }
+
+    /// enum to calculate the number of entries for a strategy
+    enum StrategyCounter {
+        Start,               // for the first node
+        Unfinished,          // counting not yet done
+        Done { count: i64 }, // this strategy path finished already
+        Obsolete,            // This path has more moves than a known path
+        End,                 //this is the last node of the strategy
+    }
+
+    /// Structure to handle the strategy.
+    /// Main Idea for every step:
+    ///   * StrategyType handles is responsible for the high-level handling (i.e. creation + iterations)
+    ///   * The StrategyStepType handles all individual Steps (i.e. break-down + counting)
+
+    struct StrategyType<'a> {
+        max_level: i8,
+        strategy_memory: Vec<StrategyStepType<'a>>,
+    }
+
+    /// Structure to handle individual steps of a strategy
+    struct StrategyStepType<'a, 'b> {
+        counter: StrategyCounter,
+        candidate_handler: CandidateHandlerType,
+        next_options: HashMap<CodeType, &'a StrategyStepType<'a, 'a>>,
+        configuration: &'b ConfigType,
+    }
+    impl StrategyStepType<'_, '_> {
+        ///initiate everything -> very first step
+        fn init<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'a, 'c>
+        where
+            'b: 'c,
+        {
+            //let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
+            let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
+            StrategyStepType {
+                counter: StrategyCounter::Start,
+                candidate_handler: CandidateHandlerType::initiate(&configuration),
+                next_options: strategy_hashmap,
+                configuration: &configuration,
+            }
+        }
+        /// find all candidates
+        fn find_candidates(&mut self) {}
+
+        /// create a strategy step for the next level
+        fn new() {}
     }
 }
 
