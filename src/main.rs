@@ -569,7 +569,7 @@ mod mastermind_solver {
         candidate_list: Vec<CandidateResultType>,
     }
     impl CandidateHandlerType {
-        pub fn new(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
+        pub fn new(candidates: &Vec<CodeType>, configuration: &ConfigType) -> Self {
             let mut result = CandidateHandlerType {
                 candidate_list: Vec::new(),
             };
@@ -626,7 +626,7 @@ mod mastermind_solver {
 
         /// initiate the first search -> containing ALL combinations
         fn initiate(configuration: &ConfigType) -> Self {
-            Self::new(get_all_codes(&configuration), &configuration)
+            Self::new(&get_all_codes(&configuration), &configuration)
         }
     }
     #[test]
@@ -635,12 +635,12 @@ mod mastermind_solver {
             colors: 2,
             columns: 2,
         };
-        let cht_one = CandidateHandlerType::new(vec![CodeType::new(vec![0, 0])], &config);
+        let cht_one = CandidateHandlerType::new(&vec![CodeType::new(vec![0, 0])], &config);
 
         assert_eq!(cht_one.len(), 1);
 
         let cht = CandidateHandlerType::new(
-            vec![
+            &vec![
                 CodeType::new(vec![0, 0]),
                 CodeType::new(vec![1, 0]),
                 CodeType::new(vec![0, 1]),
@@ -681,7 +681,7 @@ mod mastermind_solver {
 
     struct StrategyType<'a> {
         max_level: i8,
-        strategy_memory: Vec<StrategyStepType<'a>>,
+        strategy_memory: Vec<StrategyStepType<'a, 'a>>,
     }
 
     /// Structure to handle individual steps of a strategy
