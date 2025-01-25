@@ -464,6 +464,7 @@ mod mastermind_solver {
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
     use crate::mastermind_mechanics::ResultType;
+    use crate::StrategyStepType;
     use std::collections::HashMap;
 
     ///class to handle the results of one candidate
@@ -700,29 +701,41 @@ mod mastermind_solver {
     struct StrategyOptionType<'a> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
-        //next_options: Vec<StrategyStepType>,
+        next_options: Vec<&StrategyStepType>,
         configuration: &'a ConfigType,
     }
     impl StrategyOptionType<'_> {
         ///initiate everything -> very first step
-        fn init<'a>(configuration: &'a ConfigType) -> StrategyStepType<'a> {
+        fn init<'a>(configuration: &'a ConfigType) -> StrategyOptionType<'a> {
             //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
-            let mut option_list: Vec<CodeType> = Vec::new();
+
+            //let mut option_list: Vec<CodeType> = Vec::new();
+            let candidate_handler = CandidateHandlerType::initiate(&configuration);
+            return StrategyOptionType::_create(candidate_handler, StrategyCounter::Start, &configuration,);
+        }
+        fn new<'a>(candidates: &Vec<CodeType>, configuration: &'a ConfigType) {
+
+            return StrategyOptionType::_create(candidate_handler, candidates, StrategyCounter::Unfinished, &configuration);
+        }
+
+        ///internal function to create a new StrategyOptionType for both new and init
+        fn _create<'a>(
+            candidate_handler: CandidateHandlerType,
+            candidates : &Vec<CodeType>,
+            counter: StrategyCounter,
+            configuration: &'a ConfigType
+        ) -> StrategyOptionType {
+            let option_list: Vec<StrategyStepType> = candidate_handler.candidate_list.map(|candidate| StrategyStepType::new(candidates, &configuration, candidate)).collect();
             StrategyOptionType {
-                counter: StrategyCounter::Start,
-                //candidate_handler: CandidateHandlerType::initiate(&configuration),
-                //next_options: option_list,
+                counter: counter,
+                candidate_handler: candidate_handler,
+                next_options: option_list,
                 configuration: &configuration,
             }
         }
-        fn new<'a>(configuration: &'a ConfigType) {}
+        }
 
         fn fill_next_options(&mut self) {}
-    }
-
-    ///dummy class to start from the bottom
-    struct StrategyOptionType<'a> {
-        refere: &'a CodeType,
     }
 
     /// Structure to handle individual steps of a strategy
