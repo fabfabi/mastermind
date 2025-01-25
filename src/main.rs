@@ -513,7 +513,6 @@ mod mastermind_solver {
         ];
 
         let solution = CodeType::new(vec![1, 2, 3, 4]);
-        let grade_map = get_grade_hashmap(&guesses, &solution);
         let result_handler = result_handler_type::new(&guesses, &solution);
 
         assert!(result_handler.contains(&ResultType::new(4, 0)));
@@ -542,52 +541,6 @@ mod mastermind_solver {
         ];
         let result_handler_eq = result_handler_type::new(&guesses_eq, &solution);
         assert!(result_handler.eq(&result_handler_eq));
-    }
-
-    /// grade a number of guesses wrt a solution and return a hashmap
-    fn get_grade_hashmap(
-        guesses: &Vec<CodeType>,
-        solution: &CodeType,
-    ) -> HashMap<ResultType, Vec<CodeType>> {
-        let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
-
-        for guess in guesses.iter() {
-            let result = grade(&guess, &solution);
-            map.entry(result)
-                .or_insert_with(|| Vec::<CodeType>::new())
-                .push(guess.clone()); //how would this work without the "clone"?
-        }
-
-        return map;
-    }
-    #[test]
-    fn test_grade_hashmap() {
-        let guesses = vec![
-            CodeType::new(vec![1, 2, 3, 4]),
-            CodeType::new(vec![1, 1, 1, 1]),
-            CodeType::new(vec![2, 2, 2, 2]),
-            CodeType::new(vec![3, 3, 3, 3]),
-            CodeType::new(vec![4, 4, 4, 4]),
-        ];
-
-        let solution = CodeType::new(vec![1, 2, 3, 4]);
-        let grade_map = get_grade_hashmap(&guesses, &solution);
-
-        let gm_keys: Vec<&ResultType> = grade_map.keys().collect();
-        assert!(gm_keys.contains(&&ResultType::new(4, 0)));
-        assert!(gm_keys.contains(&&ResultType::new(1, 0)));
-        assert!(!gm_keys.contains(&&ResultType::new(1, 1)));
-        assert_eq!(gm_keys.len(), 2);
-        //let v = grade_map.get(&ResultType::new(1, 0));
-        //assert_eq!(v.len(), 4); // -> complaining that len is private...
-
-        for (key, val) in grade_map.iter() {
-            if key.eq(&ResultType::new(4, 0)) {
-                assert_eq!(val.len(), 1)
-            } else {
-                assert_eq!(val.len(), 4)
-            }
-        }
     }
 }
 
