@@ -49,7 +49,7 @@ mod mastermind_mechanics {
             Self { entries }
         }
 
-        ///new with a check wrt to given config
+        ///new with a check wrt to given config -> only needed for manual input stuff
         pub fn new_check(
             entries: Vec<u8>,
             configuration: &ConfigType,
@@ -62,8 +62,12 @@ mod mastermind_mechanics {
             return Ok(Self::new(entries));
         }
         ///equals a vector of other_entries
-        pub fn eq(self, other_entries: Vec<u8>) -> bool {
+        pub fn eq_vec(self, other_entries: Vec<u8>) -> bool {
             return self.entries == other_entries;
+        }
+        ///equals another CodeType
+        pub fn eq(self, other: &CodeType) -> bool {
+            return self.eq_vec(other.entries.clone());
         }
 
         pub fn print(&self) {
@@ -361,12 +365,12 @@ mod mastermind_io {
         // test the easy case
         assert!(read_code(Ok("1234".to_string()), &config)
             .unwrap()
-            .eq(vec![1, 2, 3, 4]));
+            .eq_vec(vec![1, 2, 3, 4]));
 
         // test the other case
         assert!(read_code(Ok("12d f3, oiuf4f lksjf".to_string()), &config)
             .unwrap()
-            .eq(vec![1, 2, 3, 4]));
+            .eq_vec(vec![1, 2, 3, 4]));
 
         //note: errors with incomplete columns/wrong colors are covered by CodeType::new_check
 
@@ -451,6 +455,7 @@ mod mastermind_solver {
 
     struct result_handler_type {
         result_hashmap: HashMap<ResultType, Vec<CodeType>>,
+        pub candidate: CodeType,
     }
     impl result_handler_type {
         pub fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
@@ -465,6 +470,7 @@ mod mastermind_solver {
 
             return result_handler_type {
                 result_hashmap: map,
+                candidate: solution.clone(),
             };
         }
 
@@ -541,6 +547,15 @@ mod mastermind_solver {
         ];
         let result_handler_eq = result_handler_type::new(&guesses_eq, &solution);
         assert!(result_handler.eq(&result_handler_eq));
+        assert!(result_handler.candidate.eq_vec(&solution))
+    }
+
+    /// class to identify the next inputs to test
+    struct input_handler {
+        candidate_list: Vec<CodeType>,
+    }
+    impl input_handler {
+        pub fn new(candidates: Vec<CodeType>) -> Self {}
     }
 }
 
