@@ -674,6 +674,7 @@ mod mastermind_solver {
     }
 
     /// enum to calculate the number of entries for a strategy
+    #[derive(Clone)]
     enum StrategyCounter {
         Start,                            // for the first node
         Option,                           // several options for how to continue
@@ -698,41 +699,62 @@ mod mastermind_solver {
     /// Structure to handle different options for the Strategy
     /// i.e. one of these steps could be next
     /// It links to several StrategyStepTypes
-    struct StrategyOptionType<'a> {
+    struct StrategyOptionType<'a, 'b> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
-        next_options: Vec<&StrategyStepType>,
-        configuration: &'a ConfigType,
+        next_options: Vec<&'a StrategyStepType<'a, 'a>>,
+        configuration: &'b ConfigType,
     }
-    impl StrategyOptionType<'_> {
+    impl StrategyOptionType<'_, '_> {
         ///initiate everything -> very first step
-        fn init<'a>(configuration: &'a ConfigType) -> StrategyOptionType<'a> {
-            //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
-
-            //let mut option_list: Vec<CodeType> = Vec::new();
+        fn init<'a, 'b, 'c>(
+            all_codes: &'a Vec<CodeType>,
+            configuration: &'b ConfigType,
+        ) -> StrategyOptionType<'c, 'c>
+        where
+            'a: 'c,
+            'b: 'c,
+        {
             let candidate_handler = CandidateHandlerType::initiate(&configuration);
-            return StrategyOptionType::_create(candidate_handler, StrategyCounter::Start, &configuration,);
-        }
-        fn new<'a>(candidates: &Vec<CodeType>, configuration: &'a ConfigType) {
 
-            return StrategyOptionType::_create(candidate_handler, candidates, StrategyCounter::Unfinished, &configuration);
+            return StrategyOptionType::_create(
+                candidate_handler,
+                &all_codes,
+                StrategyCounter::Start,
+                &configuration,
+            );
         }
+        /* fn new<'a>(candidates: &Vec<CodeType>, configuration: &'a ConfigType) {
+            return StrategyOptionType::_create(
+                candidate_handler,
+                candidates,
+                StrategyCounter::Unfinished,
+                &configuration,
+            );
+        } */
 
         ///internal function to create a new StrategyOptionType for both new and init
-        fn _create<'a>(
+        fn _create<'a, 'b, 'c>(
             candidate_handler: CandidateHandlerType,
-            candidates : &Vec<CodeType>,
+            candidates: &'a Vec<CodeType>,
             counter: StrategyCounter,
-            configuration: &'a ConfigType
-        ) -> StrategyOptionType {
-            let option_list: Vec<StrategyStepType> = candidate_handler.candidate_list.map(|candidate| StrategyStepType::new(candidates, &configuration, candidate)).collect();
+            configuration: &'b ConfigType,
+        ) -> StrategyOptionType<'c, 'c>
+        where
+            'a: 'c,
+            'b: 'c,
+        {
+            let option_list: Vec<StrategyStepType> = candidate_handler
+                .into_iter()
+                .candidate
+                .map(|candidate| StrategyStepType::new(candidates, &configuration, &candidate))
+                .collect();
             StrategyOptionType {
                 counter: counter,
                 candidate_handler: candidate_handler,
                 next_options: option_list,
                 configuration: &configuration,
             }
-        }
         }
 
         fn fill_next_options(&mut self) {}
@@ -773,6 +795,11 @@ mod mastermind_solver {
                 configuration: &configuration,
                 candidate: &candidate,
             }
+        }
+
+        /// count all guesses -> draft
+        fn count(&mut self) -> StrategyCounter {
+            self.counter.clone()
         }
     }
     #[test]
