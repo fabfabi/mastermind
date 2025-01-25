@@ -652,6 +652,8 @@ mod mastermind_solver {
 }
 
 mod testing {
+    use std::result::Iter;
+
     use crate::mastermind_mechanics::grade;
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
@@ -675,6 +677,47 @@ mod testing {
             .map(|s| s.parse().unwrap())
             .collect();
         assert_eq!(translation, vec![1, 2, 3])
+    }
+
+    #[test]
+    fn test_iterator() {
+        use rayon::prelude::*;
+        // test an iterator that might have a variable length
+        struct iter_test_class {
+            value_list: Vec<i32>,
+        }
+        impl iter_test_class {
+            pub fn new(values: Vec<i32>) -> Self {
+                iter_test_class { value_list: values }
+            }
+            pub fn add(&mut self, val: i32) -> Option<i32> {
+                self.value_list.push(val.clone() * 2);
+                return Some(val);
+            }
+        }
+        impl Iterator for iter_test_class {
+            type Item = i32;
+            fn next(&mut self) -> Option<Self::Item> {
+                //let val = self.v.pop()?; // "?" unpack the result and if it fails, return the error
+
+                // return the result from the match statement
+                match self.value_list.pop() {
+                    Some(val) if val < 10 => self.add(val),
+                    Some(val) => Some(val),
+                    _ => None,
+                }
+            }
+        }
+        let object = iter_test_class::new(vec![1, 2, 3]);
+
+        for val in object {
+            println!("{val}")
+        }
+        /* let object2 = iter_test_class::new(vec![1, 2, 3]);
+        let result: Vec<_> = object2
+            .par_iter()
+            .map(|&x| x * 2) // Multiply each element by 2
+            .collect(); */
     }
 }
 fn main() {
