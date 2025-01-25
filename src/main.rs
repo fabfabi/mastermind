@@ -319,6 +319,21 @@ mod mastermind_mechanics {
 
         assert_eq!(ac.len(), usize::from(6_u16.pow(4)));
 
+        let config = ConfigType {
+            colors: 2,
+            columns: 2,
+        };
+        let all_codes_small = get_all_codes(&config);
+        let target_codes_small = vec![
+            CodeType::new(vec![0, 0]),
+            CodeType::new(vec![0, 1]),
+            CodeType::new(vec![1, 0]),
+            CodeType::new(vec![1, 1]),
+        ];
+        for (code, code_target) in all_codes_small.iter().zip(target_codes_small.iter()) {
+            assert!(code.clone().eq(code_target));
+        }
+
         /* println!("entries: {}", ac.len());
         for row in ac{
             println!("{:?}", row);
@@ -447,17 +462,19 @@ mod mastermind_gameplay {
 }
 
 mod mastermind_solver {
+    use crate::mastermind_mechanics::get_all_codes;
     use crate::mastermind_mechanics::grade;
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
     use crate::mastermind_mechanics::ResultType;
     use std::collections::HashMap;
 
-    struct result_handler_type {
+    ///class to handle the results of one candidate
+    struct CandidateResultType {
         result_hashmap: HashMap<ResultType, Vec<CodeType>>,
         pub candidate: CodeType,
     }
-    impl result_handler_type {
+    impl CandidateResultType {
         pub fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
             let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
 
@@ -468,7 +485,7 @@ mod mastermind_solver {
                     .push(guess.clone()); //how would this work without the "clone"?
             }
 
-            return result_handler_type {
+            return CandidateResultType {
                 result_hashmap: map,
                 candidate: solution.clone(),
             };
@@ -519,7 +536,7 @@ mod mastermind_solver {
         ];
 
         let solution = CodeType::new(vec![1, 2, 3, 4]);
-        let result_handler = result_handler_type::new(&guesses, &solution);
+        let result_handler = CandidateResultType::new(&guesses, &solution);
 
         assert!(result_handler.contains(&ResultType::new(4, 0)));
         assert!(result_handler.contains(&ResultType::new(1, 0)));
@@ -535,7 +552,7 @@ mod mastermind_solver {
             CodeType::new(vec![3, 3, 3, 3]),
             CodeType::new(vec![4, 4, 4, 4]),
         ];
-        let result_handler_neq = result_handler_type::new(&guesses_neq, &solution);
+        let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
         assert!(!result_handler.eq(&result_handler_neq));
 
         let guesses_eq = vec![
@@ -545,17 +562,71 @@ mod mastermind_solver {
             CodeType::new(vec![4, 4, 4, 4]),
             CodeType::new(vec![0, 2, 0, 0]),
         ];
-        let result_handler_eq = result_handler_type::new(&guesses_eq, &solution);
+        let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
         assert!(result_handler.eq(&result_handler_eq));
-        assert!(result_handler.candidate.eq_vec(&solution))
+        assert!(result_handler.candidate.eq(&solution))
     }
 
     /// class to identify the next inputs to test
-    struct input_handler {
-        candidate_list: Vec<CodeType>,
+    struct CandidateHandlerType {
+        candidate_list: Vec<CandidateResultType>,
     }
-    impl input_handler {
-        pub fn new(candidates: Vec<CodeType>) -> Self {}
+    impl CandidateHandlerType {
+        pub fn new(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
+            let mut result = CandidateHandlerType {
+                candidate_list: Vec::new(),
+            };
+            // if there is only one candidate left -> no more grading needed
+            if candidates.len() == 1 {
+                let candidate = candidates[0].clone();
+                let new_candidate_result =
+                    CandidateResultType::new(&vec![candidate.clone()], &candidate);
+                result.add(new_candidate_result);
+                return result;
+            }
+            let all_candidates = get_all_codes(configuration);
+
+            for code in all_candidates.iter() {
+                let new_candidate_result = CandidateResultType::new(&candidates, code);
+                if !result.contains_similar(&new_candidate_result) {
+                    result.add(new_candidate_result)
+                }
+            }
+
+            return result;
+        }
+
+        ///check if a similar CandidateResult is already found
+        fn contains_similar(&self, other: &CandidateResultType) -> bool {
+            for code in self.candidate_list.iter() {
+                if code.eq(&other) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// adds a candidate to the list
+        fn add(&mut self, candidate: CandidateResultType) {
+            self.candidate_list.push(candidate)
+        }
+    }
+    #[test]
+    fn test_CandidateHandlerType() {
+        let config = ConfigType {
+            colors: 2,
+            columns: 2,
+        };
+        let cht = CandidateHandlerType::new(
+            vec![
+                CodeType::new(vec![0, 0]),
+                CodeType::new(vec![1, 0]),
+                CodeType::new(vec![0, 1]),
+                CodeType::new(vec![1, 1]),
+            ],
+            &config,
+        );
     }
 }
 
