@@ -623,6 +623,11 @@ mod mastermind_solver {
         fn add(&mut self, candidate: CandidateResultType) {
             self.candidate_list.push(candidate)
         }
+
+        /// initiate the first search -> containing ALL combinations
+        fn initiate(configuration: &ConfigType) -> Self {
+            Self::new(get_all_codes(&configuration), &configuration)
+        }
     }
     #[test]
     fn test_CandidateHandlerType() {
@@ -648,6 +653,16 @@ mod mastermind_solver {
         // Same color (20, 10x2, 00 as results where 10x2 means 1 correct ones and 0 correct positions with 2 codes)
         // or different color (20 10x2 02)
         assert_eq!(cht.len(), 2);
+    }
+    #[test]
+    fn high_level_check() {
+        // just check the first level of
+        let config = ConfigType {
+            colors: 6,
+            columns: 4,
+        };
+        let cht = CandidateHandlerType::initiate(&config);
+        assert_eq!(cht.len(), 5);
     }
 }
 
