@@ -442,37 +442,112 @@ mod mastermind_gameplay {
     }
 }
 
-mod testing {
+mod mastermind_solver {
     use crate::mastermind_mechanics::grade;
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
     use crate::mastermind_mechanics::ResultType;
-
     use std::collections::HashMap;
-    fn lifetime_check(_: &i64) -> i64 {
-        let return_value: i64 = 50;
 
-        return return_value;
+    struct result_handler_type {
+        result_hashmap: HashMap<ResultType, Vec<CodeType>>,
+    }
+    impl result_handler_type {
+        pub fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
+            let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
+
+            for guess in guesses.iter() {
+                let result = grade(&guess, &solution);
+                map.entry(result)
+                    .or_insert_with(|| Vec::<CodeType>::new())
+                    .push(guess.clone()); //how would this work without the "clone"?
+            }
+
+            return result_handler_type {
+                result_hashmap: map,
+            };
+        }
+
+        ///returns if a given result is present in that hashmap
+        pub fn contains(&self, other_result: &ResultType) -> bool {
+            let grade_map_keys: Vec<&ResultType> = self.result_hashmap.keys().collect();
+            return grade_map_keys.contains(&other_result);
+        }
+
+        ///returns the overall number of different results
+        pub fn num_results(&self) -> usize {
+            return self.result_hashmap.keys().len();
+        }
+
+        ///returns the number of entries for a given result
+        pub fn num_entries(&self, result: &ResultType) -> usize {
+            if let Some(entries) = self.result_hashmap.get(result) {
+                return entries.len();
+            } else {
+                return 0;
+            }
+        }
+
+        ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
+        pub fn eq(&self, other: &Self) -> bool {
+            if !other.num_results() == self.num_results() {
+                return false;
+            }
+            for (result, entries) in &self.result_hashmap {
+                if entries.len() != other.num_entries(&result) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
     #[test]
-    fn test_lifetime_check() {
-        assert_eq!(lifetime_check(&10), 50)
-    }
-    #[test]
-    fn test_vectors() {
-        let string_vec = vec!["1", "2", "3"];
-        let translation: Vec<u8> = string_vec
-            .iter()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.parse().unwrap())
-            .collect();
-        assert_eq!(translation, vec![1, 2, 3])
+    fn test_result_handler() {
+        let guesses = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![1, 1, 1, 1]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+        ];
+
+        let solution = CodeType::new(vec![1, 2, 3, 4]);
+        let grade_map = get_grade_hashmap(&guesses, &solution);
+        let result_handler = result_handler_type::new(&guesses, &solution);
+
+        assert!(result_handler.contains(&ResultType::new(4, 0)));
+        assert!(result_handler.contains(&ResultType::new(1, 0)));
+        assert!(!result_handler.contains(&ResultType::new(1, 1)));
+        assert_eq!(result_handler.num_results(), 2);
+
+        assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
+        assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
+
+        let guesses_neq = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+        ];
+        let result_handler_neq = result_handler_type::new(&guesses_neq, &solution);
+        assert!(!result_handler.eq(&result_handler_neq));
+
+        let guesses_eq = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+            CodeType::new(vec![0, 2, 0, 0]),
+        ];
+        let result_handler_eq = result_handler_type::new(&guesses_eq, &solution);
+        assert!(result_handler.eq(&result_handler_eq));
     }
 
     /// grade a number of guesses wrt a solution and return a hashmap
-    fn get_grade_hashmap<'a, 'b>(
+    fn get_grade_hashmap(
         guesses: &Vec<CodeType>,
-        solution: &'b CodeType,
+        solution: &CodeType,
     ) -> HashMap<ResultType, Vec<CodeType>> {
         let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
 
@@ -486,7 +561,7 @@ mod testing {
         return map;
     }
     #[test]
-    fn test_get_grade_hashmap() {
+    fn test_grade_hashmap() {
         let guesses = vec![
             CodeType::new(vec![1, 2, 3, 4]),
             CodeType::new(vec![1, 1, 1, 1]),
@@ -494,10 +569,7 @@ mod testing {
             CodeType::new(vec![3, 3, 3, 3]),
             CodeType::new(vec![4, 4, 4, 4]),
         ];
-        let configuration = ConfigType {
-            columns: 4,
-            colors: 6,
-        };
+
         let solution = CodeType::new(vec![1, 2, 3, 4]);
         let grade_map = get_grade_hashmap(&guesses, &solution);
 
@@ -516,6 +588,33 @@ mod testing {
                 assert_eq!(val.len(), 4)
             }
         }
+    }
+}
+
+mod testing {
+    use crate::mastermind_mechanics::grade;
+    use crate::mastermind_mechanics::CodeType;
+    use crate::mastermind_mechanics::ConfigType;
+    use crate::mastermind_mechanics::ResultType;
+
+    fn lifetime_check(_: &i64) -> i64 {
+        let return_value: i64 = 50;
+
+        return return_value;
+    }
+    #[test]
+    fn test_lifetime_check() {
+        assert_eq!(lifetime_check(&10), 50)
+    }
+    #[test]
+    fn test_vectors() {
+        let string_vec = vec!["1", "2", "3"];
+        let translation: Vec<u8> = string_vec
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().unwrap())
+            .collect();
+        assert_eq!(translation, vec![1, 2, 3])
     }
 }
 fn main() {
