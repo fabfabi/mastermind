@@ -624,6 +624,11 @@ mod mastermind_solver {
             self.candidate_list.push(candidate)
         }
 
+        /// if this is the last entry, i.e. only one candidate left
+        fn is_done(&self) -> bool {
+            return self.candidate_list.len() == 1;
+        }
+
         /// initiate the first search -> containing ALL combinations
         fn initiate(configuration: &ConfigType) -> Self {
             Self::new(&get_all_codes(&configuration), &configuration)
@@ -639,6 +644,7 @@ mod mastermind_solver {
         let cht_one = CandidateHandlerType::new(&vec![CodeType::new(vec![0, 0])], &config);
 
         assert_eq!(cht_one.len(), 1);
+        assert!(cht_one.is_done());
 
         let cht = CandidateHandlerType::new(
             &vec![
@@ -668,12 +674,13 @@ mod mastermind_solver {
 
     /// enum to calculate the number of entries for a strategy
     enum StrategyCounter {
-        Start,               // for the first node
-        Option,              // several options for how to continue
-        Unfinished,          // counting not yet done
-        Done { count: i64 }, // this strategy path finished already
-        Obsolete,            // This path has more moves than a known path
-        End,                 // this is the last node of the strategy
+        Start,                            // for the first node
+        Option,                           // several options for how to continue
+        Unfinished,                       // counting not yet done
+        PartiallyFinished { count: i64 }, //first count available
+        Done { count: i64 },              // this strategy path finished already
+        Obsolete,                         // This path has more moves than a known path
+        End,                              // this is the last node of the strategy
     }
 
     /// Structure to handle the strategy.
@@ -737,14 +744,29 @@ mod mastermind_solver {
         where
             'b: 'c,
         {
+            let candidate_handler = CandidateHandlerType::new(&candidates, &configuration);
+            let counter = match candidate_handler.is_done() {
+                true => StrategyCounter::End,
+                _ => StrategyCounter::Unfinished,
+            };
             //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
             StrategyStepType {
-                counter: StrategyCounter::Unfinished,
-                candidate_handler: CandidateHandlerType::new(&candidates, &configuration),
+                counter: counter,
+                candidate_handler: candidate_handler,
                 //next_options: strategy_hashmap,
                 configuration: &configuration,
             }
         }
+    }
+    #[test]
+    fn test_StrategyStepType() {
+        let config = ConfigType {
+            colors: 2,
+            columns: 2,
+        };
+
+        let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
+        assert!(matches!(sst_one.counter, StrategyCounter::End));
     }
 }
 
