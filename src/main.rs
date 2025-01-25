@@ -744,6 +744,8 @@ mod mastermind_solver {
             'a: 'c,
             'b: 'c,
         {
+            //let input = vec![vec![1, 2], vec![3, 4], vec![5, 6]]; // Example input
+            //let result: Vec<_> = input.iter().flat_map(|b| b.iter()).collect();
             let option_list: Vec<StrategyStepType> = candidate_handler
                 .into_iter()
                 .candidate
@@ -779,6 +781,7 @@ mod mastermind_solver {
             candidate: &'c CodeType,
         ) -> StrategyStepType<'d, 'd>
         where
+            'a: 'd,
             'b: 'd,
             'c: 'd,
         {
