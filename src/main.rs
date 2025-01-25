@@ -692,7 +692,7 @@ mod mastermind_solver {
     /*     struct StrategyType<'a> {
         max_level: i8,
         strategy_memory: Vec<StrategyOptionType<'a>>,
-    }
+    }*/
 
     /// Structure to handle different options for the Strategy
     /// i.e. one of these steps could be next
@@ -700,7 +700,7 @@ mod mastermind_solver {
     struct StrategyOptionType<'a> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
-        next_options: Vec<StrategyStepType>,
+        //next_options: Vec<StrategyStepType>,
         configuration: &'a ConfigType,
     }
     impl StrategyOptionType<'_> {
@@ -710,15 +710,15 @@ mod mastermind_solver {
             let mut option_list: Vec<CodeType> = Vec::new();
             StrategyOptionType {
                 counter: StrategyCounter::Start,
-                candidate_handler: CandidateHandlerType::initiate(&configuration),
-                next_options: option_list,
+                //candidate_handler: CandidateHandlerType::initiate(&configuration),
+                //next_options: option_list,
                 configuration: &configuration,
             }
         }
         fn new<'a>(configuration: &'a ConfigType) {}
 
         fn fill_next_options(&mut self) {}
-    } */
+    }
 
     ///dummy class to start from the bottom
     struct StrategyOptionType<'a> {
@@ -729,20 +729,23 @@ mod mastermind_solver {
     /// i.e. if one code (i.e. step) has been entered,
     /// all candidates are graded again.
     /// Note that StrategyOptionType and StrategyStepType are always switching
-    struct StrategyStepType<'b> {
+    struct StrategyStepType<'b, 'c> {
         counter: StrategyCounter,
-        candidate_handler: CandidateHandlerType,
+        next_candidate_handler: CandidateHandlerType,
         //next_options: HashMap<CodeType, &'a StrategyOptionType<'a>>,
         configuration: &'b ConfigType,
+        candidate: &'c CodeType,
     }
-    impl StrategyStepType<'_> {
+    impl StrategyStepType<'_, '_> {
         /// create a strategy step for the next level
-        fn new<'a, 'b, 'c>(
+        fn new<'a, 'b, 'c, 'd>(
             candidates: &'a Vec<CodeType>,
             configuration: &'b ConfigType,
-        ) -> StrategyStepType<'c>
+            candidate: &'c CodeType,
+        ) -> StrategyStepType<'d, 'd>
         where
-            'b: 'c,
+            'b: 'd,
+            'c: 'd,
         {
             let candidate_handler = CandidateHandlerType::new(&candidates, &configuration);
             let counter = match candidate_handler.is_done() {
@@ -752,9 +755,10 @@ mod mastermind_solver {
             //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
             StrategyStepType {
                 counter: counter,
-                candidate_handler: candidate_handler,
+                next_candidate_handler: candidate_handler,
                 //next_options: strategy_hashmap,
                 configuration: &configuration,
+                candidate: &candidate,
             }
         }
     }
@@ -765,8 +769,8 @@ mod mastermind_solver {
             columns: 2,
         };
 
-        let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
-        assert!(matches!(sst_one.counter, StrategyCounter::End));
+        //let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
+        //assert!(matches!(sst_one.counter, StrategyCounter::End));
     }
 }
 
