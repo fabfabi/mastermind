@@ -62,11 +62,11 @@ mod mastermind_mechanics {
             return Ok(Self::new(entries));
         }
         ///equals a vector of other_entries
-        pub fn eq_vec(self, other_entries: Vec<u8>) -> bool {
+        pub fn eq_vec(&self, other_entries: Vec<u8>) -> bool {
             return self.entries == other_entries;
         }
         ///equals another CodeType
-        pub fn eq(self, other: &CodeType) -> bool {
+        pub fn eq(&self, other: &CodeType) -> bool {
             return self.eq_vec(other.entries.clone());
         }
 
@@ -402,9 +402,6 @@ mod mastermind_io {
             }
         }
     }
-
-    #[test]
-    fn test_enter_code() {}
 }
 
 mod mastermind_gameplay {
@@ -596,14 +593,29 @@ mod mastermind_solver {
             return result;
         }
 
-        ///check if a similar CandidateResult is already found
-        fn contains_similar(&self, other: &CandidateResultType) -> bool {
+        /// check if a similar CandidateResult is already found
+        fn contains_similar(&self, other_candidate_result: &CandidateResultType) -> bool {
             for code in self.candidate_list.iter() {
-                if code.eq(&other) {
+                if code.eq(&other_candidate_result) {
                     return true;
                 }
             }
 
+            return false;
+        }
+
+        /// return the number of candidates found
+        pub fn len(&self) -> usize {
+            return self.candidate_list.len();
+        }
+
+        /// check if a code is contained as a candidate
+        fn contains(&self, other_candidate: &CodeType) -> bool {
+            for candidate_result_type in self.candidate_list.iter() {
+                if other_candidate.eq(&candidate_result_type.candidate) {
+                    return true;
+                };
+            }
             return false;
         }
 
@@ -618,6 +630,10 @@ mod mastermind_solver {
             colors: 2,
             columns: 2,
         };
+        let cht_one = CandidateHandlerType::new(vec![CodeType::new(vec![0, 0])], &config);
+
+        assert_eq!(cht_one.len(), 1);
+
         let cht = CandidateHandlerType::new(
             vec![
                 CodeType::new(vec![0, 0]),
@@ -627,6 +643,11 @@ mod mastermind_solver {
             ],
             &config,
         );
+
+        // there should be only two candidates.
+        // Same color (20, 10x2, 00 as results where 10x2 means 1 correct ones and 0 correct positions with 2 codes)
+        // or different color (20 10x2 02)
+        assert_eq!(cht.len(), 2);
     }
 }
 
