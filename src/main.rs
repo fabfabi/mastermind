@@ -476,7 +476,8 @@ mod mastermind_solver {
     struct CandidateResultType {
         result_hashmap: HashMap<ResultType, Vec<CodeType>>,
         pub candidate: CodeType,
-        //counter: StrategyCounter,
+        //pub counter: StrategyCounter,
+        number_of_candidates: usize,
     }
     impl CandidateResultType {
         fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
@@ -493,6 +494,7 @@ mod mastermind_solver {
                 result_hashmap: map,
                 candidate: solution.clone(),
                 //counter: StrategyCounter::Unfinished,
+                number_of_candidates: guesses.len(),
             };
         }
 
@@ -530,9 +532,31 @@ mod mastermind_solver {
             return true;
         }
 
-        ///count all needed steps for this candidate
-        fn count(&self, max: Option<u8>) -> StrategyCounter {
-            StrategyCounter::Unfinished
+        ///execute the counting logic
+        fn count(&self, max: Option<usize>) -> StrategyCounter {
+            if let Some(number) = max {
+                //do not count if that does not make sense
+                // best case scenario would be to get one right in the next step
+                // and all others in the step after
+                if number < 2 * self.number_of_candidates - 1 {
+                    //self.counter = StrategyCounter::Obsolete;
+                    return StrategyCounter::Obsolete;
+                }
+            }
+            if self.num_results() == self.number_of_candidates {
+                // if there is just one candidate left in this group
+                // note: the ResultHandlerType ensures, that the last candidate is also taken
+                if 1 == self.number_of_candidates {
+                    return StrategyCounter::Done { count: 1 };
+                }
+
+                let value: u16 = self.number_of_candidates as u16;
+                //self.counter =
+                return StrategyCounter::PartiallyFinished {
+                    count: 2 * value, // worst case scenario, if the solution is not found in the next step
+                };
+            }
+            return StrategyCounter::Unfinished;
         }
     }
     #[test]
@@ -556,6 +580,12 @@ mod mastermind_solver {
         assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
         assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
 
+        assert!(matches!(
+            result_handler.count(None),
+            StrategyCounter::Unfinished
+        ));
+
+        // example that should not be equal to above
         let guesses_neq = vec![
             CodeType::new(vec![1, 2, 3, 4]),
             CodeType::new(vec![2, 2, 2, 2]),
@@ -565,6 +595,7 @@ mod mastermind_solver {
         let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
         assert!(!result_handler.eq(&result_handler_neq));
 
+        //another example that should be equal to the result handler
         let guesses_eq = vec![
             CodeType::new(vec![1, 2, 3, 4]),
             CodeType::new(vec![2, 2, 2, 2]),
@@ -574,7 +605,28 @@ mod mastermind_solver {
         ];
         let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
         assert!(result_handler.eq(&result_handler_eq));
-        assert!(result_handler.candidate.eq(&solution))
+        assert!(result_handler.candidate.eq(&solution));
+
+        //now testing also the count -> for only one result
+        let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
+        let result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
+        assert!(!matches!(
+            result_handler_cnt1.count(None),
+            StrategyCounter::Done { count: 1 }
+        ));
+        /*
+        //now testing also the count -> for two results
+        let guesses_cnt2 = vec![CodeType::new(vec![1, 2, 3, 4])];
+        let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+        assert!(matches!(
+            result_handler_cnt2.count(None),
+            StrategyCounter::PartiallyFinished { count: 4 } // remember -> this tests against the worst case
+        ));
+        // check if the Obsolete path works
+        assert!(matches!(
+            result_handler_cnt2.count(Some(2)),
+            StrategyCounter::Obsolete // remember -> this tests against the worst case
+        )); */
     }
 
     /// class to identify the next inputs to test
@@ -621,7 +673,7 @@ mod mastermind_solver {
         }
 
         /// return the number of candidates found
-        pub fn len(&self) -> usize {
+        fn len(&self) -> usize {
             return self.candidate_list.len();
         }
 
@@ -649,6 +701,14 @@ mod mastermind_solver {
         fn initiate(configuration: &ConfigType) -> Self {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
+
+        /// function to initiate the counting
+        fn count(&self) -> StrategyCounter {
+            StrategyCounter::Unfinished
+        }
+
+        /// clear all obsolete codes
+        fn clear_obsolete(&mut self) {}
     }
 
     #[test]
@@ -694,8 +754,8 @@ mod mastermind_solver {
         Start,                            // for the first node
         Option,                           // several options for how to continue
         Unfinished,                       // counting not yet done
-        PartiallyFinished { count: i64 }, //first count available
-        Done { count: i64 },              // this strategy path finished already
+        PartiallyFinished { count: u16 }, //first count available
+        Done { count: u16 },              // this strategy path finished already
         Obsolete,                         // This path has more moves than a known path
         End,                              // this is the last node of the strategy
     }
@@ -828,6 +888,30 @@ mod testing {
             .par_iter()
             .map(|&x| x * 2) // Multiply each element by 2
             .collect(); */
+    }
+    #[test]
+    fn colsure_test() {
+        // test how to set a value and return something via a closure
+        struct test_struct {
+            val: i32,
+        }
+        impl test_struct {
+            fn fun(&mut self, val: bool) -> i32 {
+                let mut cl = |x: i32| {
+                    self.val = x.clone();
+                    return x;
+                };
+
+                // note: only works, because of this match statement here. The closure does not end the function call
+                match val {
+                    true => cl(1),
+                    false => cl(0),
+                }
+            }
+        }
+        let mut t = test_struct { val: 10 };
+        assert_eq!(t.fun(true), 1);
+        assert_eq!(t.val, 1);
     }
 }
 fn main() {
