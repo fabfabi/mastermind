@@ -412,7 +412,7 @@ mod mastermind_io {
 
 mod mastermind_gameplay {
     use crate::mastermind_io;
-    use crate::mastermind_mechanics;
+    //use crate::mastermind_mechanics;
     use crate::mastermind_mechanics::generate_code;
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
@@ -473,6 +473,7 @@ mod mastermind_solver {
     use std::collections::HashMap;
 
     ///class to handle the results of one candidate
+    #[derive(Clone)]
     struct CandidateResultType {
         result_hashmap: HashMap<ResultType, Vec<CodeType>>,
         pub candidate: CodeType,
@@ -531,7 +532,8 @@ mod mastermind_solver {
 
             return true;
         }
-
+    }
+    impl StrategyCounterTrait for CandidateResultType {
         ///execute the counting logic
         fn count(&self, max: Option<usize>) -> StrategyCounter {
             if let Some(number) = max {
@@ -636,11 +638,13 @@ mod mastermind_solver {
     /// class to identify the next inputs to test
     struct CandidateHandlerType {
         candidate_list: Vec<CandidateResultType>,
+        count_storer: StrategyCounter,
     }
     impl CandidateHandlerType {
         pub fn new(candidates: &Vec<CodeType>, configuration: &ConfigType) -> Self {
             let mut result = CandidateHandlerType {
                 candidate_list: Vec::new(),
+                count_storer: StrategyCounter::Unfinished,
             };
             // if there are only a few candidates left, no more grading needed
             // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
@@ -705,10 +709,41 @@ mod mastermind_solver {
         fn initiate(configuration: &ConfigType) -> Self {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
+
+        ///
+        fn update_count_storer(&mut self, max: Option<usize>) {
+            (self.candidate_list, self.count_storer) =
+                count_and_clean(self.candidate_list.clone(), max)
+        }
+    }
+    impl StrategyCounterTrait for CandidateHandlerType {
+        fn count(&self, max: Option<usize>) -> StrategyCounter {
+            //matcher to overrule to obsolete if a better strategy has been found
+            let matcher = |t: StrategyCounter, num: usize, max_number: usize| {
+                if num >= max_number {
+                    return StrategyCounter::Obsolete;
+                }
+                return t;
+            };
+            // unpack the maximum
+            if let Some(given_max_number) = max {
+                match self.count_storer {
+                    StrategyCounter::Done { count: number } => {
+                        return matcher(self.count_storer, number as usize, given_max_number)
+                    }
+                    StrategyCounter::PartiallyFinished { count: number } => {
+                        return matcher(self.count_storer, number as usize, given_max_number)
+                    }
+                    _ => return self.count_storer,
+                }
+            }
+            // otherwise just return the count_storer
+            return self.count_storer;
+        }
     }
 
     #[test]
-    fn test_CandidateHandlerType() {
+    fn test_candidatehandlertype() {
         let config = ConfigType {
             colors: 2,
             columns: 2,
@@ -734,7 +769,7 @@ mod mastermind_solver {
         assert_eq!(cht.len(), 2);
     }
     #[test]
-    fn test_CandidateHandlerType_highlevelcheck() {
+    fn test_candidatehandlertype_highlevelcheck() {
         // just check the first level of
         let config = ConfigType {
             colors: 6,
@@ -891,15 +926,15 @@ mod mastermind_solver {
     }
 
     /// enum to calculate the number of entries for a strategy
-    #[derive(Clone, PartialEq, Debug)]
+    #[derive(Clone, PartialEq, Debug, Copy)]
     enum StrategyCounter {
-        Start,                            // for the first node
-        Option,                           // several options for how to continue
+        Start, // for the first node
+        //Option,                           // several options for how to continue
         Unfinished,                       // counting not yet done
         PartiallyFinished { count: u16 }, //first count available
         Done { count: u16 },              // this strategy path finished already
         Obsolete,                         // This path has more moves than a known path
-        End,                              // this is the last node of the strategy
+                                          //End,                              // this is the last node of the strategy
     }
 
     /// Structure to handle the strategy.
@@ -953,7 +988,7 @@ mod mastermind_solver {
     }
 
     #[test]
-    fn test_StrategyStepType() {
+    fn test_strategysteptype() {
         let config = ConfigType {
             colors: 2,
             columns: 2,
