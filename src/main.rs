@@ -705,56 +705,6 @@ mod mastermind_solver {
         fn initiate(configuration: &ConfigType) -> Self {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
-
-        /// function to do the counting and clean up all obsolete paths
-        fn count(&mut self, max: Option<usize>) -> StrategyCounter {
-            let mut best_count: u16 = match max {
-                Some(number) => number as u16,
-                _ => 65535, //biggest u16
-            };
-
-            // the loop has to be run twice if there is one that is done
-            for candidate in self.candidate_list.iter() {
-                let new_val = match candidate.count(Some(best_count as usize)) {
-                    StrategyCounter::Done { count: number } => number,
-                    StrategyCounter::PartiallyFinished { count: number } => number,
-                    StrategyCounter::Obsolete => continue,
-                    _ => {
-                        continue;
-                    }
-                };
-                if new_val < best_count {
-                    best_count = new_val
-                }
-            }
-            // create some test variables that determine the return value
-            let mut one_done = false; // if one is done
-            let mut all_done = true; // if all are done
-            let mut one_partially_finished = false; // if one is partially finished
-
-            // now remove all obsolete ones -> and update the booleans according to the best_count
-            self.candidate_list
-                .retain(|x| match x.count(Some(best_count as usize)) {
-                    StrategyCounter::Done { count: _ } => {
-                        one_done = true;
-                        true
-                    }
-                    StrategyCounter::PartiallyFinished { count: _ } => {
-                        one_partially_finished = true;
-                        all_done = false;
-                        true
-                    }
-                    StrategyCounter::Obsolete => false,
-                    _ => true,
-                });
-
-            if all_done {
-                return StrategyCounter::Done { count: best_count };
-            } else if one_partially_finished | one_done {
-                return StrategyCounter::PartiallyFinished { count: best_count };
-            }
-            return StrategyCounter::Unfinished;
-        }
     }
 
     #[test]
@@ -792,6 +742,72 @@ mod mastermind_solver {
         };
         let cht = CandidateHandlerType::initiate(&config);
         assert_eq!(cht.len(), 5);
+    }
+
+    ///trait designed to support the counting function.
+    /// If all are done or obsolete -> done
+    /// if at least one is done or partially finished -> partially finished
+    /// otherwise return
+    trait StrategyCounterTrait {
+        fn count(self: &Self, max: Option<usize>) -> StrategyCounter;
+    }
+
+    /// function to do the counting and clean up all obsolete paths
+    fn count_trategy_generic<T>(mut candidate_list: Vec<T>, max: Option<usize>) -> StrategyCounter
+    where
+        T: StrategyCounterTrait,
+    {
+        let mut best_count: u16 = match max {
+            Some(number) => number as u16,
+            _ => 65535, //biggest u16
+        };
+
+        // the loop has to be run twice if there is one that is done
+        for candidate in candidate_list.iter() {
+            let new_val = match candidate.count(Some(best_count as usize)) {
+                StrategyCounter::Done { count: number } => number,
+                StrategyCounter::PartiallyFinished { count: number } => number,
+                StrategyCounter::Obsolete => continue,
+                _ => {
+                    continue;
+                }
+            };
+            if new_val < best_count {
+                best_count = new_val
+            }
+        }
+        // create some test variables that determine the return value
+        let mut one_done = false; // if one is done
+        let mut all_done = true; // if all are done
+        let mut one_partially_finished = false; // if one is partially finished
+
+        // now remove all obsolete ones -> and update the booleans according to the best_count
+        candidate_list.retain(|x| match x.count(Some(best_count as usize)) {
+            StrategyCounter::Done { count: _ } => {
+                one_done = true;
+                true
+            }
+            StrategyCounter::PartiallyFinished { count: _ } => {
+                one_partially_finished = true;
+                all_done = false;
+
+                true
+            }
+            StrategyCounter::Obsolete => false,
+            _ => {
+                all_done = false;
+                true
+            }
+        });
+
+        if all_done {
+            return StrategyCounter::Done { count: best_count };
+        } else if one_partially_finished | one_done {
+            return StrategyCounter::PartiallyFinished { count: best_count };
+        } else if candidate_list.len() == 0 {
+            return StrategyCounter::Obsolete;
+        }
+        return StrategyCounter::Unfinished;
     }
 
     /// enum to calculate the number of entries for a strategy
@@ -969,6 +985,43 @@ mod testing {
         vector.retain(|&x| x % 2 == 0);
 
         assert_eq!(vector, vec![2, 4, 6]);
+    }
+
+    #[test]
+    fn test_trait() {
+        trait Counter {
+            fn count(self: &Self) -> i32;
+        }
+        struct TestStruct {
+            value: i32,
+        }
+        impl Counter for TestStruct {
+            fn count(&self) -> i32 {
+                return self.value;
+            }
+        }
+
+        let mut v = vec![
+            TestStruct { value: 1 },
+            TestStruct { value: 2 },
+            TestStruct { value: 3 },
+            TestStruct { value: 4 },
+        ];
+
+        fn trait_test<T>(mut vector: Vec<T>) -> Vec<T>
+        where
+            T: Counter,
+        {
+            vector.retain(|x| x.count() % 2 == 0);
+
+            for item in vector.iter() {
+                println!("{}", item.count());
+            }
+            vector
+        }
+        trait_test(v);
+        // just to check
+        //assert!(false);
     }
 }
 fn main() {
