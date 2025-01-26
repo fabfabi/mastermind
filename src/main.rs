@@ -706,9 +706,53 @@ mod mastermind_solver {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
 
-        /// function to initiate the counting
-        fn count(&self) -> StrategyCounter {
-            StrategyCounter::Unfinished
+        /// function to do the counting and clean up all obsolete paths
+        fn count(&mut self, max: Option<usize>) -> StrategyCounter {
+            let mut best_count: u16 = match max {
+                Some(number) => number as u16,
+                _ => 65535, //biggest u16
+            };
+            // create some test variables that determine the return value
+            let mut one_done = false; // if one is done
+            let mut all_done = true; // if all are done
+            let mut one_partially_finished = false; // if one is partially finished
+
+            // the loop has to be run twice if there is one that is done
+            for candidate in self.candidate_list.iter() {
+                let new_val = match candidate.count(Some(best_count as usize)) {
+                    StrategyCounter::Done { count: number } => {
+                        one_done = true;
+                        number
+                    }
+                    StrategyCounter::PartiallyFinished { count: number } => {
+                        one_partially_finished = true;
+                        all_done = false;
+                        number
+                    }
+                    StrategyCounter::Obsolete => continue,
+                    _ => {
+                        all_done = false;
+                        continue;
+                    }
+                };
+                if new_val < best_count {
+                    best_count = new_val
+                }
+            }
+
+            // now remove all obsolete ones
+            self.candidate_list
+                .retain(|x| match x.count(Some(best_count as usize)) {
+                    StrategyCounter::Obsolete => false, //remove
+                    _ => true,                          // keep
+                });
+
+            if all_done {
+                return StrategyCounter::Done { count: best_count };
+            } else if one_partially_finished | one_done {
+                return StrategyCounter::PartiallyFinished { count: best_count };
+            }
+            return StrategyCounter::Unfinished;
         }
 
         /// clear all obsolete codes
@@ -895,7 +939,7 @@ mod testing {
             .collect(); */
     }
     #[test]
-    fn colsure_test() {
+    fn closure_test() {
         // test how to set a value and return something via a closure
         struct test_struct {
             val: i32,
@@ -917,6 +961,16 @@ mod testing {
         let mut t = test_struct { val: 10 };
         assert_eq!(t.fun(true), 1);
         assert_eq!(t.val, 1);
+    }
+    #[test]
+    fn vector_test() {
+        let mut vector = vec![1, 2, 3, 4, 5, 6];
+
+        //let fun = |x| x % 2 == 0;
+        //vector.retain(fun);
+        vector.retain(|&x| x % 2 == 0);
+
+        assert_eq!(vector, vec![2, 4, 6]);
     }
 }
 fn main() {
