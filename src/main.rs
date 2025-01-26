@@ -464,7 +464,6 @@ mod mastermind_solver {
     use crate::mastermind_mechanics::CodeType;
     use crate::mastermind_mechanics::ConfigType;
     use crate::mastermind_mechanics::ResultType;
-    use crate::StrategyStepType;
     use std::collections::HashMap;
 
     ///class to handle the results of one candidate
@@ -688,123 +687,52 @@ mod mastermind_solver {
     /// Structure to handle the strategy.
     /// Main Idea for every step:
     ///   * StrategyType handles is responsible for the high-level handling (i.e. creation + iterations)
-    ///   * The StrategyOption types handles all different possible options (i.e. identifying how to break-down + counting)
-    ///   * The StrategyStepType handles all individual Steps (i.e. how to break it down / if Result => candidates)
-
-    /*     struct StrategyType<'a> {
-        max_level: i8,
-        strategy_memory: Vec<StrategyOptionType<'a>>,
-    }*/
-
+    ///   * The StrategyStepType types handles all different possible options (i.e. identifying how to break-down + counting)
+    ///   * it wraps around the CandidateHandlerType
     /// Structure to handle different options for the Strategy
     /// i.e. one of these steps could be next
     /// It links to several StrategyStepTypes
-    struct StrategyOptionType<'a, 'b> {
+    struct StrategyStepType<'a, 'b> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
         next_options: Vec<&'a StrategyStepType<'a, 'a>>,
         configuration: &'b ConfigType,
     }
-    impl StrategyOptionType<'_, '_> {
+    impl StrategyStepType<'_, '_> {
         ///initiate everything -> very first step
-        fn init<'a, 'b, 'c>(
-            all_codes: &'a Vec<CodeType>,
-            configuration: &'b ConfigType,
-        ) -> StrategyOptionType<'c, 'c>
+        fn initiate<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c, 'c>
         where
             'a: 'c,
             'b: 'c,
         {
             let candidate_handler = CandidateHandlerType::initiate(&configuration);
 
-            return StrategyOptionType::_create(
-                candidate_handler,
-                &all_codes,
-                StrategyCounter::Start,
-                &configuration,
-            );
+            return StrategyStepType {
+                counter: StrategyCounter::Start,
+                candidate_handler: candidate_handler,
+                next_options: Vec::new(),
+                configuration: &configuration,
+            };
         }
-        /* fn new<'a>(candidates: &Vec<CodeType>, configuration: &'a ConfigType) {
-            return StrategyOptionType::_create(
-                candidate_handler,
-                candidates,
-                StrategyCounter::Unfinished,
-                &configuration,
-            );
-        } */
-
-        ///internal function to create a new StrategyOptionType for both new and init
-        fn _create<'a, 'b, 'c>(
-            candidate_handler: CandidateHandlerType,
+        /// create a new Strategy Step type in the control flow
+        fn new<'a, 'b, 'c>(
             candidates: &'a Vec<CodeType>,
-            counter: StrategyCounter,
             configuration: &'b ConfigType,
-        ) -> StrategyOptionType<'c, 'c>
+        ) -> StrategyStepType<'c, 'c>
         where
             'a: 'c,
             'b: 'c,
         {
-            //let input = vec![vec![1, 2], vec![3, 4], vec![5, 6]]; // Example input
-            //let result: Vec<_> = input.iter().flat_map(|b| b.iter()).collect();
-            let option_list: Vec<StrategyStepType> = candidate_handler
-                .into_iter()
-                .candidate
-                .map(|candidate| StrategyStepType::new(candidates, &configuration, &candidate))
-                .collect();
-            StrategyOptionType {
-                counter: counter,
+            let candidate_handler = CandidateHandlerType::new(candidates, &configuration);
+            return StrategyStepType {
+                counter: StrategyCounter::Unfinished,
                 candidate_handler: candidate_handler,
-                next_options: option_list,
+                next_options: Vec::new(),
                 configuration: &configuration,
-            }
-        }
-
-        fn fill_next_options(&mut self) {}
-    }
-
-    /// Structure to handle individual steps of a strategy
-    /// i.e. if one code (i.e. step) has been entered,
-    /// all candidates are graded again.
-    /// Note that StrategyOptionType and StrategyStepType are always switching
-    struct StrategyStepType<'b, 'c> {
-        counter: StrategyCounter,
-        next_candidate_handler: CandidateHandlerType,
-        //next_options: HashMap<CodeType, &'a StrategyOptionType<'a>>,
-        configuration: &'b ConfigType,
-        candidate: &'c CodeType,
-    }
-    impl StrategyStepType<'_, '_> {
-        /// create a strategy step for the next level
-        fn new<'a, 'b, 'c, 'd>(
-            candidates: &'a Vec<CodeType>,
-            configuration: &'b ConfigType,
-            candidate: &'c CodeType,
-        ) -> StrategyStepType<'d, 'd>
-        where
-            'a: 'd,
-            'b: 'd,
-            'c: 'd,
-        {
-            let candidate_handler = CandidateHandlerType::new(&candidates, &configuration);
-            let counter = match candidate_handler.is_done() {
-                true => StrategyCounter::End,
-                _ => StrategyCounter::Unfinished,
             };
-            //let mut strategy_hashmap: HashMap<CodeType, &StrategyStepType> = HashMap::new();
-            StrategyStepType {
-                counter: counter,
-                next_candidate_handler: candidate_handler,
-                //next_options: strategy_hashmap,
-                configuration: &configuration,
-                candidate: &candidate,
-            }
-        }
-
-        /// count all guesses -> draft
-        fn count(&mut self) -> StrategyCounter {
-            self.counter.clone()
         }
     }
+
     #[test]
     fn test_StrategyStepType() {
         let config = ConfigType {
