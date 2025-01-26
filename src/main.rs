@@ -546,7 +546,7 @@ mod mastermind_solver {
             if self.num_results() == self.number_of_candidates {
                 // if there is just one candidate left in this group
                 // note: the ResultHandlerType ensures, that the last candidate is also taken
-                if 1 == self.number_of_candidates {
+                if self.number_of_candidates == 1 {
                     return StrategyCounter::Done { count: 1 };
                 }
 
@@ -749,12 +749,15 @@ mod mastermind_solver {
     /// if at least one is done or partially finished -> partially finished
     /// if all are obsolete -> obsolete
     /// otherwise return Unfinished
+    ///
+    /// Important:
+    ///  * count needs to return: if count < max => Obsolete
     trait StrategyCounterTrait {
         fn count(self: &Self, max: Option<usize>) -> StrategyCounter;
     }
 
     /// function to do the counting and clean up all obsolete paths
-    fn count_strategy_generic<T>(
+    fn count_and_clean<T>(
         mut candidate_list: Vec<T>,
         max: Option<usize>,
     ) -> (Vec<T>, StrategyCounter)
@@ -786,7 +789,9 @@ mod mastermind_solver {
         let mut one_partially_finished = false; // if one is partially finished
 
         // now remove all obsolete ones -> and update the booleans according to the best_count
-        candidate_list.retain(|x| match x.count(Some(best_count as usize)) {
+        candidate_list.retain_mut(|x| match x.count(Some(best_count as usize)) {
+            StrategyCounter::Obsolete => false,
+            // all others will be kept
             StrategyCounter::Done { count: _ } => {
                 one_done = true;
                 true
@@ -797,24 +802,92 @@ mod mastermind_solver {
 
                 true
             }
-            StrategyCounter::Obsolete => false,
+
             _ => {
                 all_done = false;
                 true
             }
         });
-
-        if all_done {
+        if candidate_list.len() == 0 {
+            return (candidate_list, StrategyCounter::Obsolete);
+        } else if all_done {
             return (candidate_list, StrategyCounter::Done { count: best_count });
         } else if one_partially_finished | one_done {
             return (
                 candidate_list,
                 StrategyCounter::PartiallyFinished { count: best_count },
             );
-        } else if candidate_list.len() == 0 {
-            return (candidate_list, StrategyCounter::Obsolete);
         }
         return (candidate_list, StrategyCounter::Unfinished);
+    }
+
+    #[test]
+    fn test_count_and_clean() {
+        // use std::cmp;
+        use StrategyCounter;
+        /// just a dummy struct to easily fake up some data
+        #[derive(Debug, PartialEq)]
+        struct S {
+            v: u16,
+        }
+        impl StrategyCounterTrait for S {
+            fn count(&self, max: Option<usize>) -> StrategyCounter {
+                let matcher = |x| match x {
+                    0 => StrategyCounter::Obsolete,
+                    1 => StrategyCounter::Unfinished,
+                    2..=5 => StrategyCounter::Done { count: x },
+                    _ => StrategyCounter::PartiallyFinished { count: x },
+                };
+                if let Some(number) = max {
+                    if number < self.v as usize {
+                        return matcher(0);
+                    }
+                }
+                return matcher(self.v);
+            }
+        }
+
+        // check if the matcher works correctly
+        let s = S { v: 0 };
+        assert_eq!(s.count(None), StrategyCounter::Obsolete);
+        let s = S { v: 1 };
+        assert_eq!(s.count(None), StrategyCounter::Unfinished);
+        let s = S { v: 2 };
+        assert_eq!(s.count(None), StrategyCounter::Done { count: 2 });
+        let s = S { v: 5 };
+        assert_eq!(s.count(Some(2)), StrategyCounter::Obsolete);
+
+        // now the magic
+        let mut v: Vec<S>;
+        let mut c: StrategyCounter;
+
+        // first test
+        v = vec![S { v: 0 }, S { v: 1 }, S { v: 2 }];
+        (v, c) = count_and_clean(v, None);
+        // should remove 0 as obsolete
+        assert_eq!(v, vec![S { v: 1 }, S { v: 2 }]);
+        assert_eq!(c, StrategyCounter::PartiallyFinished { count: 2 });
+
+        // Second test
+        v = vec![S { v: 1 }, S { v: 3 }, S { v: 10 }];
+        (v, c) = count_and_clean(v, None);
+        // should remove 10 as obsolete and keep the unfinished one
+        assert_eq!(v, vec![S { v: 1 }, S { v: 3 }]);
+        assert_eq!(c, StrategyCounter::PartiallyFinished { count: 3 });
+
+        // third test
+        v = vec![S { v: 0 }, S { v: 3 }, S { v: 4 }];
+        (v, c) = count_and_clean(v, None);
+        // should keep just the best done one
+        assert_eq!(v, vec![S { v: 3 }]);
+        assert_eq!(c, StrategyCounter::Done { count: 3 });
+
+        // fourth test -> same as third with a maximum
+        v = vec![S { v: 8 }, S { v: 3 }, S { v: 4 }];
+        (v, c) = count_and_clean(v, Some(2));
+        // should keep just the best done one
+        assert_eq!(v, vec![]);
+        assert_eq!(c, StrategyCounter::Obsolete);
     }
 
     /// enum to calculate the number of entries for a strategy
