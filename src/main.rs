@@ -712,26 +712,14 @@ mod mastermind_solver {
                 Some(number) => number as u16,
                 _ => 65535, //biggest u16
             };
-            // create some test variables that determine the return value
-            let mut one_done = false; // if one is done
-            let mut all_done = true; // if all are done
-            let mut one_partially_finished = false; // if one is partially finished
 
             // the loop has to be run twice if there is one that is done
             for candidate in self.candidate_list.iter() {
                 let new_val = match candidate.count(Some(best_count as usize)) {
-                    StrategyCounter::Done { count: number } => {
-                        one_done = true;
-                        number
-                    }
-                    StrategyCounter::PartiallyFinished { count: number } => {
-                        one_partially_finished = true;
-                        all_done = false;
-                        number
-                    }
+                    StrategyCounter::Done { count: number } => number,
+                    StrategyCounter::PartiallyFinished { count: number } => number,
                     StrategyCounter::Obsolete => continue,
                     _ => {
-                        all_done = false;
                         continue;
                     }
                 };
@@ -739,12 +727,25 @@ mod mastermind_solver {
                     best_count = new_val
                 }
             }
+            // create some test variables that determine the return value
+            let mut one_done = false; // if one is done
+            let mut all_done = true; // if all are done
+            let mut one_partially_finished = false; // if one is partially finished
 
-            // now remove all obsolete ones
+            // now remove all obsolete ones -> and update the booleans according to the best_count
             self.candidate_list
                 .retain(|x| match x.count(Some(best_count as usize)) {
-                    StrategyCounter::Obsolete => false, //remove
-                    _ => true,                          // keep
+                    StrategyCounter::Done { count: _ } => {
+                        one_done = true;
+                        true
+                    }
+                    StrategyCounter::PartiallyFinished { count: _ } => {
+                        one_partially_finished = true;
+                        all_done = false;
+                        true
+                    }
+                    StrategyCounter::Obsolete => false,
+                    _ => true,
                 });
 
             if all_done {
@@ -754,9 +755,6 @@ mod mastermind_solver {
             }
             return StrategyCounter::Unfinished;
         }
-
-        /// clear all obsolete codes
-        fn clear_obsolete(&mut self) {}
     }
 
     #[test]
