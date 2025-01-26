@@ -745,15 +745,19 @@ mod mastermind_solver {
     }
 
     ///trait designed to support the counting function.
-    /// If all are done or obsolete -> done
+    /// If all are done -> done
     /// if at least one is done or partially finished -> partially finished
-    /// otherwise return
+    /// if all are obsolete -> obsolete
+    /// otherwise return Unfinished
     trait StrategyCounterTrait {
         fn count(self: &Self, max: Option<usize>) -> StrategyCounter;
     }
 
     /// function to do the counting and clean up all obsolete paths
-    fn count_trategy_generic<T>(mut candidate_list: Vec<T>, max: Option<usize>) -> StrategyCounter
+    fn count_strategy_generic<T>(
+        mut candidate_list: Vec<T>,
+        max: Option<usize>,
+    ) -> (Vec<T>, StrategyCounter)
     where
         T: StrategyCounterTrait,
     {
@@ -801,13 +805,16 @@ mod mastermind_solver {
         });
 
         if all_done {
-            return StrategyCounter::Done { count: best_count };
+            return (candidate_list, StrategyCounter::Done { count: best_count });
         } else if one_partially_finished | one_done {
-            return StrategyCounter::PartiallyFinished { count: best_count };
+            return (
+                candidate_list,
+                StrategyCounter::PartiallyFinished { count: best_count },
+            );
         } else if candidate_list.len() == 0 {
-            return StrategyCounter::Obsolete;
+            return (candidate_list, StrategyCounter::Obsolete);
         }
-        return StrategyCounter::Unfinished;
+        return (candidate_list, StrategyCounter::Unfinished);
     }
 
     /// enum to calculate the number of entries for a strategy
