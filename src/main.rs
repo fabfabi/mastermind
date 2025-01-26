@@ -710,7 +710,7 @@ mod mastermind_solver {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
 
-        ///
+        /// update the count store and clean up the candidate list
         fn update_count_storer(&mut self, max: Option<usize>) {
             (self.candidate_list, self.count_storer) =
                 count_and_clean(self.candidate_list.clone(), max)
@@ -718,21 +718,22 @@ mod mastermind_solver {
     }
     impl StrategyCounterTrait for CandidateHandlerType {
         fn count(&self, max: Option<usize>) -> StrategyCounter {
-            //matcher to overrule to obsolete if a better strategy has been found
-            let matcher = |t: StrategyCounter, num: usize, max_number: usize| {
-                if num >= max_number {
-                    return StrategyCounter::Obsolete;
-                }
-                return t;
-            };
             // unpack the maximum
             if let Some(given_max_number) = max {
+                //matcher to overrule to obsolete if a better strategy has been found
+                let count_overruler = |t: StrategyCounter, num: usize| {
+                    if num >= given_max_number {
+                        return StrategyCounter::Obsolete;
+                    }
+                    return t;
+                };
+                // and match to the current count
                 match self.count_storer {
                     StrategyCounter::Done { count: number } => {
-                        return matcher(self.count_storer, number as usize, given_max_number)
+                        return count_overruler(self.count_storer, number as usize)
                     }
                     StrategyCounter::PartiallyFinished { count: number } => {
-                        return matcher(self.count_storer, number as usize, given_max_number)
+                        return count_overruler(self.count_storer, number as usize)
                     }
                     _ => return self.count_storer,
                 }
