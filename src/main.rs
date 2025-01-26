@@ -30,9 +30,15 @@ mod mastermind_mechanics {
             };
         }
         /// check if the solution was already found
-        pub fn done(&self, configuration: &ConfigType) -> bool {
+        pub fn is_done(&self, configuration: &ConfigType) -> bool {
             configuration.columns == self.positions.into()
         }
+
+        // check if the solution was found referencing to a number
+        pub fn is_done_num(&self, width: usize) -> bool {
+            width == self.positions.into()
+        }
+
         fn string(&self) -> String {
             return f!("{p} {c}", p = &self.positions, c = &self.colors);
         }
@@ -175,7 +181,7 @@ mod mastermind_mechanics {
 
         ///was the solution found already?
         pub fn done(&self, configuration: &ConfigType) -> bool {
-            return self.result.done(&configuration);
+            return self.result.is_done(&configuration);
         }
 
         pub fn print(&self) {
@@ -470,9 +476,10 @@ mod mastermind_solver {
     struct CandidateResultType {
         result_hashmap: HashMap<ResultType, Vec<CodeType>>,
         pub candidate: CodeType,
+        //counter: StrategyCounter,
     }
     impl CandidateResultType {
-        pub fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
+        fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
             let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
 
             for guess in guesses.iter() {
@@ -485,22 +492,23 @@ mod mastermind_solver {
             return CandidateResultType {
                 result_hashmap: map,
                 candidate: solution.clone(),
+                //counter: StrategyCounter::Unfinished,
             };
         }
 
         ///returns if a given result is present in that hashmap
-        pub fn contains(&self, other_result: &ResultType) -> bool {
+        fn contains(&self, other_result: &ResultType) -> bool {
             let grade_map_keys: Vec<&ResultType> = self.result_hashmap.keys().collect();
             return grade_map_keys.contains(&other_result);
         }
 
         ///returns the overall number of different results
-        pub fn num_results(&self) -> usize {
+        fn num_results(&self) -> usize {
             return self.result_hashmap.keys().len();
         }
 
         ///returns the number of entries for a given result
-        pub fn num_entries(&self, result: &ResultType) -> usize {
+        fn num_entries(&self, result: &ResultType) -> usize {
             if let Some(entries) = self.result_hashmap.get(result) {
                 return entries.len();
             } else {
@@ -509,7 +517,7 @@ mod mastermind_solver {
         }
 
         ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
-        pub fn eq(&self, other: &Self) -> bool {
+        fn eq(&self, other: &Self) -> bool {
             if !other.num_results() == self.num_results() {
                 return false;
             }
@@ -520,6 +528,11 @@ mod mastermind_solver {
             }
 
             return true;
+        }
+
+        ///count all needed steps for this candidate
+        fn count(&self, max: Option<u8>) -> StrategyCounter {
+            StrategyCounter::Unfinished
         }
     }
     #[test]
@@ -573,8 +586,9 @@ mod mastermind_solver {
             let mut result = CandidateHandlerType {
                 candidate_list: Vec::new(),
             };
-            // if there is only one candidate left -> no more grading needed
-            if candidates.len() == 1 {
+            // if there are only a few candidates left, no more grading needed
+            // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
+            if candidates.len() <= 2 {
                 let candidate = candidates[0].clone();
                 let new_candidate_result =
                     CandidateResultType::new(&vec![candidate.clone()], &candidate);
@@ -585,7 +599,9 @@ mod mastermind_solver {
 
             for code in all_candidates.iter() {
                 let new_candidate_result = CandidateResultType::new(&candidates, code);
-                if !result.contains_similar(&new_candidate_result) {
+                if (new_candidate_result.num_results() > 1) // no benefit in checking candidate that does not increase information
+                    & (!result.contains_similar(&new_candidate_result))
+                {
                     result.add(new_candidate_result)
                 }
             }
