@@ -610,23 +610,27 @@ mod mastermind_solver {
         //now testing also the count -> for only one result
         let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
         let result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
-        assert!(!matches!(
+
+        assert_eq!(
             result_handler_cnt1.count(None),
             StrategyCounter::Done { count: 1 }
-        ));
-        /*
+        );
+
         //now testing also the count -> for two results
-        let guesses_cnt2 = vec![CodeType::new(vec![1, 2, 3, 4])];
+        let guesses_cnt2 = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![1, 2, 3, 5]),
+        ];
         let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
-        assert!(matches!(
+        assert_eq!(
             result_handler_cnt2.count(None),
             StrategyCounter::PartiallyFinished { count: 4 } // remember -> this tests against the worst case
-        ));
+        );
         // check if the Obsolete path works
-        assert!(matches!(
+        assert_eq!(
             result_handler_cnt2.count(Some(2)),
             StrategyCounter::Obsolete // remember -> this tests against the worst case
-        )); */
+        );
     }
 
     /// class to identify the next inputs to test
@@ -749,7 +753,7 @@ mod mastermind_solver {
     }
 
     /// enum to calculate the number of entries for a strategy
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq, Debug)]
     enum StrategyCounter {
         Start,                            // for the first node
         Option,                           // several options for how to continue
@@ -768,6 +772,7 @@ mod mastermind_solver {
     /// Structure to handle different options for the Strategy
     /// i.e. one of these steps could be next
     /// It links to several StrategyStepTypes
+
     struct StrategyStepType<'a, 'b> {
         counter: StrategyCounter,
         candidate_handler: CandidateHandlerType,
