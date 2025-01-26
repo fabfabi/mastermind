@@ -785,7 +785,7 @@ mod mastermind_solver {
         assert_eq!(cht.count(None), StrategyCounter::Unfinished);
 
         //////////////////////////////////////////
-        /// now with only three as input
+        // now with only three as input
         let mut cht = CandidateHandlerType::new(
             &vec![
                 CodeType::new(vec![0, 0]),
@@ -806,16 +806,13 @@ mod mastermind_solver {
             StrategyCounter::PartiallyFinished { count: 5 } // 10 will calculate a partial finish at 5
         );
 
-        // TODO -> MACHEN!!! Count Funktion testen
-    }
-    #[test]
-    fn test_candidatehandlertype_highlevelcheck() {
-        // just check the first level of
-        let config = ConfigType {
+        //////////////////////////////////////////
+        //  just a check on the high-level
+        let config64 = ConfigType {
             colors: 6,
             columns: 4,
         };
-        let cht = CandidateHandlerType::initiate(&config);
+        let cht = CandidateHandlerType::initiate(&config64);
         assert_eq!(cht.len(), 5);
     }
 
