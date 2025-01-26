@@ -84,6 +84,11 @@ mod mastermind_mechanics {
         pub fn grade(&self, other: &Self) -> ResultType {
             return grade(&self, &other);
         }
+
+        /// return the length of the codeType for the case that a config cannot be accessed
+        pub fn len(&self) -> usize {
+            return self.entries.len();
+        }
     }
     #[test]
     fn test_newCodeType_check() {
@@ -553,9 +558,15 @@ mod mastermind_solver {
                 }
 
                 let value: u16 = self.number_of_candidates as u16;
-                //self.counter =
-                return StrategyCounter::PartiallyFinished {
-                    count: 2 * value, // worst case scenario, if the solution is not found in the next step
+
+                // check if the solution was found and return the number of steps
+                return match self.contains(&ResultType::new(self.candidate.len() as u8, 0)) {
+                    true => StrategyCounter::PartiallyFinished {
+                        count: 2 * value - 1, // exact number is clear
+                    },
+                    _ => StrategyCounter::PartiallyFinished {
+                        count: 2 * value, // worst case scenario, since the solution is not part of this step
+                    },
                 };
             }
             return StrategyCounter::Unfinished;
@@ -626,12 +637,12 @@ mod mastermind_solver {
         let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
         assert_eq!(
             result_handler_cnt2.count(None),
-            StrategyCounter::PartiallyFinished { count: 4 } // remember -> this tests against the worst case
+            StrategyCounter::PartiallyFinished { count: 3 }
         );
         // check if the Obsolete path works
         assert_eq!(
             result_handler_cnt2.count(Some(2)),
-            StrategyCounter::Obsolete // remember -> this tests against the worst case
+            StrategyCounter::Obsolete // not better than the other one -> obsolete
         );
     }
 
@@ -754,7 +765,7 @@ mod mastermind_solver {
         assert_eq!(cht_one.len(), 1);
         assert!(cht_one.is_done());
 
-        let cht = CandidateHandlerType::new(
+        let mut cht = CandidateHandlerType::new(
             &vec![
                 CodeType::new(vec![0, 0]),
                 CodeType::new(vec![1, 0]),
@@ -768,6 +779,34 @@ mod mastermind_solver {
         // Same color (20, 10x2, 00 as results where 10x2 means 1 correct ones and 0 correct positions with 2 codes)
         // or different color (20 10x2 02)
         assert_eq!(cht.len(), 2);
+
+        cht.update_count_storer(None);
+
+        assert_eq!(cht.count(None), StrategyCounter::Unfinished);
+
+        //////////////////////////////////////////
+        /// now with only three as input
+        let mut cht = CandidateHandlerType::new(
+            &vec![
+                CodeType::new(vec![0, 0]),
+                CodeType::new(vec![1, 0]),
+                CodeType::new(vec![0, 1]),
+            ],
+            &config,
+        );
+        // now there will be three candidates:
+        // 00 will get 20 and 10x2
+        // 10 or 01 will get 20, 10, 02 -> partially finished!
+        // 11 will get 00 and 10 x 2
+        assert_eq!(cht.len(), 3);
+
+        cht.update_count_storer(None);
+        assert_eq!(
+            cht.count(None),
+            StrategyCounter::PartiallyFinished { count: 5 } // 10 will calculate a partial finish at 5
+        );
+
+        // TODO -> MACHEN!!! Count Funktion testen
     }
     #[test]
     fn test_candidatehandlertype_highlevelcheck() {
@@ -792,7 +831,7 @@ mod mastermind_solver {
         fn count(self: &Self, max: Option<usize>) -> StrategyCounter;
     }
 
-    /// function to do the counting and clean up all obsolete paths
+    /// function to do the counting and cleaning up of all obsolete paths
     fn count_and_clean<T>(
         mut candidate_list: Vec<T>,
         max: Option<usize>,
@@ -963,7 +1002,7 @@ mod mastermind_solver {
             let candidate_handler = CandidateHandlerType::initiate(&configuration);
 
             return StrategyStepType {
-                counter: StrategyCounter::Start,
+                counter: StrategyCounter::Unfinished,
                 candidate_handler: candidate_handler,
                 next_options: Vec::new(),
                 configuration: &configuration,
@@ -996,7 +1035,15 @@ mod mastermind_solver {
         };
 
         //let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
-        //assert!(matches!(sst_one.counter, StrategyCounter::End));
+        //assert_eq!(sst_one.counter, StrategyCounter::Unfinished);
+
+        let mut sst = StrategyStepType::initiate(&config);
+
+        sst.candidate_handler.update_count_storer(None);
+        assert_eq!(
+            sst.candidate_handler.count_storer,
+            StrategyCounter::Unfinished,
+        )
     }
 }
 
