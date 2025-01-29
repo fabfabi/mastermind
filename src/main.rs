@@ -989,6 +989,12 @@ mod mastermind_solver {
             return number..self.max_id;
         }
     }
+    #[test]
+    fn test_idgenerator() {
+        let mut generator = StepIDGenerator::new();
+        assert_eq!(generator.get(5), 0..5);
+        assert_eq!(generator.get(5), 5..10);
+    }
     /// enum to contain either a borrow to a list of candidates or a candidate handler
     /// this is needed in order to seprate the creation of the strategy step type from the
     /// iteration step.
