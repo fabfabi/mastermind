@@ -999,7 +999,7 @@ mod mastermind_solver {
     }
     impl CandidateOption<'_> {
         /// return MUTABLE reference to the CandidateHandler
-        fn work(&mut self) -> &mut CandidateHandlerType {
+        fn mutate(&mut self) -> &mut CandidateHandlerType {
             if let CandidateOption::instantiated { handler } = self {
                 return handler;
             } else {
@@ -1015,6 +1015,17 @@ mod mastermind_solver {
                 return handler;
             } else {
                 panic!("CandidateOption is not yet instantiated")
+            }
+        }
+
+        /// instantiate to replace the borrowed reference with the Candidate Handler
+        fn instantiate(&mut self, configuration: &ConfigType) {
+            if let CandidateOption::raw { candidates } = self {
+                *self = CandidateOption::instantiated {
+                    handler: CandidateHandlerType::new(candidates, configuration),
+                };
+            } else {
+                panic!("CandidateOption is already instantiated")
             }
         }
     }
@@ -1074,17 +1085,19 @@ mod mastermind_solver {
         /// convert all the candidate options from "raw" to "initiated"
         /// this costs some calculation time since all possible candidates are checked
         fn instantiate(&mut self) {
-            if let CandidateOption::raw { candidates } = self.candidate_option {
+            self.candidate_option.instantiate(self.configuration);
+
+            /* if let CandidateOption::raw { candidates } = self.candidate_option {
                 self.candidate_option = CandidateOption::instantiated {
                     handler: (CandidateHandlerType::new(candidates, self.configuration)),
                 }
             } else {
                 panic!("Strategy Step was already instantiated!!!")
-            }
+            } */
         }
-        /// work with the candidate handler
-        fn work(&mut self) -> &mut CandidateHandlerType {
-            return self.candidate_option.work();
+        /// work with the candidate handler as mutable reference
+        fn mutate(&mut self) -> &mut CandidateHandlerType {
+            return self.candidate_option.mutate();
         }
 
         /// borrow the candidate handler
@@ -1105,7 +1118,7 @@ mod mastermind_solver {
 
         let mut sst = StrategyStepType::initiate_beginning(&config);
 
-        sst.work().update_count_storer(None);
+        sst.mutate().update_count_storer(None);
         assert_eq!(sst.borrow().count_storer, StrategyCounter::Unfinished,)
     }
 }
