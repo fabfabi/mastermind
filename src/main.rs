@@ -974,6 +974,51 @@ mod mastermind_solver {
                                           //End,                              // this is the last node of the strategy
     }
 
+    ///simple struct to generate IDs for every new step
+    struct StepIDGenerator {
+        max_id: u128,
+    }
+    impl StepIDGenerator {
+        fn new() -> Self {
+            StepIDGenerator { max_id: 0 }
+        }
+        /// return a range of 'n' IDs
+        fn get(&mut self, n: u16) -> std::ops::Range<u128> {
+            let number = self.max_id.clone();
+            self.max_id += n as u128;
+            return number..self.max_id;
+        }
+    }
+    /// enum to contain either a borrow to a list of candidates or a candidate handler
+    /// this is needed in order to seprate the creation of the strategy step type from the
+    /// iteration step.
+    /// This allows parallelization by removing the borrow once it is initiated
+    enum CandidateOption<'a> {
+        raw { candidates: &'a Vec<CodeType> },
+        instantiated { handler: CandidateHandlerType },
+    }
+    impl CandidateOption<'_> {
+        /// return MUTABLE reference to the CandidateHandler
+        fn work(&mut self) -> &mut CandidateHandlerType {
+            if let CandidateOption::instantiated { handler } = self {
+                return handler;
+            } else {
+                panic!("CandidateOption is not yet instantiated")
+            }
+        }
+        /// return immutable reference to the CandidateHandler
+        fn borrow<'a, 'b>(&'a self) -> &'b CandidateHandlerType
+        where
+            'a: 'b,
+        {
+            if let CandidateOption::instantiated { handler } = self {
+                return handler;
+            } else {
+                panic!("CandidateOption is not yet instantiated")
+            }
+        }
+    }
+
     /// Structure to handle the strategy.
     /// Main Idea for every step:
     ///   * StrategyType handles is responsible for the high-level handling (i.e. creation + iterations)
@@ -985,13 +1030,13 @@ mod mastermind_solver {
 
     struct StrategyStepType<'a, 'b> {
         counter: StrategyCounter,
-        candidate_handler: CandidateHandlerType,
-        next_options: Vec<&'a StrategyStepType<'a, 'a>>,
+        candidate_option: CandidateOption<'a>,
+        next_options: Vec<u128>,
         configuration: &'b ConfigType,
     }
     impl StrategyStepType<'_, '_> {
         ///initiate everything -> very first step
-        fn initiate<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c, 'c>
+        fn initiate_beginning<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c, 'c>
         where
             'a: 'c,
             'b: 'c,
@@ -1000,7 +1045,9 @@ mod mastermind_solver {
 
             return StrategyStepType {
                 counter: StrategyCounter::Unfinished,
-                candidate_handler: candidate_handler,
+                candidate_option: CandidateOption::instantiated {
+                    handler: candidate_handler,
+                },
                 next_options: Vec::new(),
                 configuration: &configuration,
             };
@@ -1014,13 +1061,35 @@ mod mastermind_solver {
             'a: 'c,
             'b: 'c,
         {
-            let candidate_handler = CandidateHandlerType::new(candidates, &configuration);
             return StrategyStepType {
                 counter: StrategyCounter::Unfinished,
-                candidate_handler: candidate_handler,
+                candidate_option: CandidateOption::raw {
+                    candidates: &candidates,
+                },
                 next_options: Vec::new(),
                 configuration: &configuration,
             };
+        }
+
+        /// convert all the candidate options from "raw" to "initiated"
+        /// this costs some calculation time since all possible candidates are checked
+        fn instantiate(&mut self) {
+            if let CandidateOption::raw { candidates } = self.candidate_option {
+                self.candidate_option = CandidateOption::instantiated {
+                    handler: (CandidateHandlerType::new(candidates, self.configuration)),
+                }
+            } else {
+                panic!("Strategy Step was already instantiated!!!")
+            }
+        }
+        /// work with the candidate handler
+        fn work(&mut self) -> &mut CandidateHandlerType {
+            return self.candidate_option.work();
+        }
+
+        /// borrow the candidate handler
+        fn borrow<'a>(&'a self) -> &'a CandidateHandlerType {
+            return self.candidate_option.borrow();
         }
     }
 
@@ -1034,13 +1103,10 @@ mod mastermind_solver {
         //let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
         //assert_eq!(sst_one.counter, StrategyCounter::Unfinished);
 
-        let mut sst = StrategyStepType::initiate(&config);
+        let mut sst = StrategyStepType::initiate_beginning(&config);
 
-        sst.candidate_handler.update_count_storer(None);
-        assert_eq!(
-            sst.candidate_handler.count_storer,
-            StrategyCounter::Unfinished,
-        )
+        sst.work().update_count_storer(None);
+        assert_eq!(sst.borrow().count_storer, StrategyCounter::Unfinished,)
     }
 }
 
