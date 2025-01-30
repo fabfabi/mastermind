@@ -717,7 +717,7 @@ mod mastermind_solver {
         }
 
         /// initiate the first search -> containing ALL combinations
-        fn initiate(configuration: &ConfigType) -> Self {
+        fn instantiate(configuration: &ConfigType) -> Self {
             Self::new(&get_all_codes(&configuration), &configuration)
         }
 
@@ -753,6 +753,15 @@ mod mastermind_solver {
             return self.count_storer;
         }
     }
+    /* //core::iter::traits::iterator;
+    impl Iterator for CandidateHandlerType {
+        type Item = CandidateResultType;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            return Some(self.candidate_list.last());
+        }
+
+    } */
 
     #[test]
     fn test_candidatehandlertype() {
@@ -812,7 +821,7 @@ mod mastermind_solver {
             colors: 6,
             columns: 4,
         };
-        let cht = CandidateHandlerType::initiate(&config64);
+        let cht = CandidateHandlerType::instantiate(&config64);
         assert_eq!(cht.len(), 5);
     }
 
@@ -983,17 +992,22 @@ mod mastermind_solver {
             StepIDGenerator { max_id: 0 }
         }
         /// return a range of 'n' IDs
-        fn get(&mut self, n: u16) -> std::ops::Range<u128> {
+        fn get_range(&mut self, n: u16) -> std::ops::Range<u128> {
             let number = self.max_id.clone();
             self.max_id += n as u128;
             return number..self.max_id;
+        }
+
+        ///get the highest number used
+        fn get_highest(&self) -> u128 {
+            return self.max_id - 1;
         }
     }
     #[test]
     fn test_idgenerator() {
         let mut generator = StepIDGenerator::new();
-        assert_eq!(generator.get(5), 0..5);
-        assert_eq!(generator.get(5), 5..10);
+        assert_eq!(generator.get_range(5), 0..5);
+        assert_eq!(generator.get_range(5), 5..10);
     }
     /// enum to contain either a borrow to a list of candidates or a candidate handler
     /// this is needed in order to seprate the creation of the strategy step type from the
@@ -1058,7 +1072,7 @@ mod mastermind_solver {
             'a: 'c,
             'b: 'c,
         {
-            let candidate_handler = CandidateHandlerType::initiate(&configuration);
+            let candidate_handler = CandidateHandlerType::instantiate(&configuration);
 
             return StrategyStepType {
                 counter: StrategyCounter::Unfinished,
@@ -1101,6 +1115,13 @@ mod mastermind_solver {
                 panic!("Strategy Step was already instantiated!!!")
             } */
         }
+
+        /// add the ids as next options
+        fn add_ids(&mut self, id_range: std::ops::Range<u128>) {
+            //let new_items = id_range.collect();
+            let mut new_items = Vec::from_iter(id_range);
+            self.next_options.append(&mut new_items);
+        }
         /// work with the candidate handler as mutable reference
         fn mutate(&mut self) -> &mut CandidateHandlerType {
             return self.candidate_option.mutate();
@@ -1126,6 +1147,75 @@ mod mastermind_solver {
 
         sst.mutate().update_count_storer(None);
         assert_eq!(sst.borrow().count_storer, StrategyCounter::Unfinished,)
+    }
+
+    /// high level object to handle the strategy.
+    /// It manages all the individual step types as well as the connections
+    /// All individual steps are stored in one giant hashmap
+    struct StrategyHandler<'a, 'b> {
+        id_generator: StepIDGenerator,
+        memory: HashMap<u128, StrategyStepType<'a, 'a>>,
+        configuration: &'b ConfigType,
+        max_level: u8,
+        current_level: u8,
+        level_keys: Vec<(u128, u128)>,
+    }
+    impl StrategyHandler<'_, '_> {
+        pub fn new<'a>(confiuration: &'a ConfigType, max_level: u8) -> StrategyHandler<'a, 'a> {
+            let mut hashmap: HashMap<u128, StrategyStepType> = HashMap::new();
+
+            let mut step_handler = StrategyStepType::initiate_beginning(&confiuration);
+            //retrieve the initial value as 0
+            let mut id_generator = StepIDGenerator::new();
+            id_generator.get_range(1);
+            hashmap.insert(0 as u128, step_handler);
+
+            let mut strategy_handler = StrategyHandler {
+                id_generator: id_generator,
+                configuration: &confiuration,
+                memory: hashmap,
+                max_level: max_level,
+                current_level: 0,
+                level_keys: vec![(0, 1)],
+            };
+
+            return strategy_handler;
+        }
+
+        /*  /// create the next level
+        /// 1. create the next level (serial)
+        /// 2. instantiate the next level (i.e. identify the best candidates)
+        /// 3. calculate the count (backwards from the last level to the highets one)
+        /// 4. backward pass to delete all steps that are obsolete
+        fn propagate(&mut self) {
+            if self.current_level > self.max_level {
+                println!("last level reached");
+                panic!("done -> fix");
+            }
+            // store the currently highest number
+            let new_lvl_begin = self.id_generator.get_highest() + 1;
+
+            let (lvl_begin, lvl_end) = if let Some(&tuple) = self.level_keys.last() {
+                tuple
+            } else {
+                panic!("no level boundaries")
+            };
+            let next_level_creator = |handler: &mut StrategyStepType| {
+                for candidate in handler.borrow().candidate_list {
+                    let new_id_range = self.id_generator.get_range(handler.borrow().len() as u16);
+                    handler.add_ids(new_id_range);
+                    handler.borrow().candidate_list.iter().map()
+                }
+            };
+
+            //(lvl_begin..lvl_end).map(self.memory)
+
+            // and save the boundaries of the last level
+            let new_lvl_end = self.id_generator.get_highest();
+            self.level_keys.push((new_lvl_begin, new_lvl_end));
+
+            //outline:
+        } */
     }
 }
 
@@ -1267,6 +1357,15 @@ mod testing {
         trait_test(v);
         // just to check
         //assert!(false);
+    }
+    #[test]
+    fn tuple_test() {
+        let v = vec![(1, 2)];
+
+        if let Some(&(a, b)) = v.last() {
+            println!("{} {}", a, b);
+        }
+        println!("{:?}", v);
     }
 }
 fn main() {
