@@ -43,7 +43,7 @@ mod mastermind_mechanics {
             return f!("{p} {c}", p = &self.positions, c = &self.colors);
         }
     }
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     ///code for one single try
     pub struct CodeType {
         entries: Vec<u8>, //[u8; COLUMNS],
@@ -476,6 +476,7 @@ mod mastermind_solver {
     use crate::mastermind_mechanics::ConfigType;
     use crate::mastermind_mechanics::ResultType;
     use std::collections::HashMap;
+    use std::hash::Hash;
 
     ///class to handle the results of one candidate
     #[derive(Clone)]
@@ -1039,7 +1040,7 @@ mod mastermind_solver {
         }
 
         /// instantiate to replace the borrowed reference with the Candidate Handler
-        fn instantiate(&mut self, configuration: &ConfigType) {
+        fn instantiate<'a>(&mut self, configuration: &'a ConfigType) {
             if let CandidateOption::raw { candidates } = self {
                 *self = CandidateOption::instantiated {
                     handler: CandidateHandlerType::new(candidates, configuration),
@@ -1062,7 +1063,8 @@ mod mastermind_solver {
     struct StrategyStepType<'a, 'b> {
         counter: StrategyCounter,
         candidate_option: CandidateOption<'a>,
-        next_options: Vec<u128>,
+        //next_options: Vec<u128>,
+        next_options: HashMap<CodeType, Vec<u128>>,
         configuration: &'b ConfigType,
     }
     impl StrategyStepType<'_, '_> {
@@ -1079,12 +1081,12 @@ mod mastermind_solver {
                 candidate_option: CandidateOption::instantiated {
                     handler: candidate_handler,
                 },
-                next_options: Vec::new(),
+                next_options: HashMap::new(),
                 configuration: &configuration,
             };
         }
-        /// create a new Strategy Step type in the control flow
-        fn new<'a, 'b, 'c>(
+        /// create a new Strategy Step type in the control flow based on a borrowed vector of CodeTypes
+        fn new_ref<'a, 'b, 'c>(
             candidates: &'a Vec<CodeType>,
             configuration: &'b ConfigType,
         ) -> StrategyStepType<'c, 'c>
@@ -1097,9 +1099,22 @@ mod mastermind_solver {
                 candidate_option: CandidateOption::raw {
                     candidates: &candidates,
                 },
-                next_options: Vec::new(),
+                next_options: HashMap::new(),
                 configuration: &configuration,
             };
+        }
+        /// create a new Strategy Step type in the control flow
+        fn new<'a, 'b, 'c>(
+            candidates: &'a Vec<CodeType>,
+            configuration: &'b ConfigType,
+        ) -> StrategyStepType<'c, 'c>
+        where
+            'a: 'c,
+            'b: 'c,
+        {
+            let mut sst = Self::new_ref(&candidates, &configuration);
+            sst.instantiate();
+            return sst;
         }
 
         /// convert all the candidate options from "raw" to "initiated"
@@ -1117,10 +1132,10 @@ mod mastermind_solver {
         }
 
         /// add the ids as next options
-        fn add_ids(&mut self, id_range: std::ops::Range<u128>) {
+        fn add_ids(&mut self, candidate: &CodeType, id_range: std::ops::Range<u128>) {
             //let new_items = id_range.collect();
-            let mut new_items = Vec::from_iter(id_range);
-            self.next_options.append(&mut new_items);
+            let id_vector = Vec::from_iter(id_range);
+            self.next_options.insert(candidate.clone(), id_vector);
         }
         /// work with the candidate handler as mutable reference
         fn mutate(&mut self) -> &mut CandidateHandlerType {
@@ -1182,7 +1197,7 @@ mod mastermind_solver {
             return strategy_handler;
         }
 
-        /*  /// create the next level
+        /// create the next level
         /// 1. create the next level (serial)
         /// 2. instantiate the next level (i.e. identify the best candidates)
         /// 3. calculate the count (backwards from the last level to the highets one)
@@ -1200,11 +1215,28 @@ mod mastermind_solver {
             } else {
                 panic!("no level boundaries")
             };
+            /*
+            // 1. create the next level
             let next_level_creator = |handler: &mut StrategyStepType| {
-                for candidate in handler.borrow().candidate_list {
+                for candidate_results in &handler.borrow().candidate_list {
+                    let id_start = self.id_generator.get_highest() + 1;
+
+                    // add the id_range and the candidate to the StrategyStep
                     let new_id_range = self.id_generator.get_range(handler.borrow().len() as u16);
-                    handler.add_ids(new_id_range);
-                    handler.borrow().candidate_list.iter().map()
+                    for ((_, candidates), new_id) in candidate_results
+                        .result_hashmap
+                        .into_iter()
+                        .zip(new_id_range)
+                    {
+                        self.memory.insert(
+                            new_id,
+                            StrategyStepType::new(&candidates, &self.configuration),
+                        );
+                    }
+
+                    let id_end = self.id_generator.get_highest();
+                    handler.add_ids(&candidate_results.candidate, id_start..id_end);
+                    //handler.borrow().candidate_list.iter().map();
                 }
             };
 
@@ -1212,10 +1244,10 @@ mod mastermind_solver {
 
             // and save the boundaries of the last level
             let new_lvl_end = self.id_generator.get_highest();
-            self.level_keys.push((new_lvl_begin, new_lvl_end));
+            self.level_keys.push((new_lvl_begin, new_lvl_end)); */
 
             //outline:
-        } */
+        }
     }
 }
 
@@ -1367,7 +1399,36 @@ mod testing {
         }
         println!("{:?}", v);
     }
+
+    #[test]
+    fn lifetime_test() {
+        #[derive(Clone)]
+        struct TestStruct {
+            value: i32,
+        }
+
+        enum Tester<'a> {
+            Before { reference: &'a TestStruct },
+            After { value: TestStruct },
+        }
+        impl Tester<'_> {
+            fn instantiate(&mut self) {
+                if let Tester::Before { reference: T } = self {
+                    *self = Tester::After { value: T.clone() };
+                } else {
+                    panic!("CandidateOption is already instantiated")
+                }
+            }
+        }
+
+        let mut at = TestStruct { value: 2 };
+
+        let bt = &at;
+
+        let mut ae = Tester::Before { reference: bt };
+    }
 }
+
 fn main() {
     println!("Hello, world!");
     use mastermind_gameplay::game as mastermind;
