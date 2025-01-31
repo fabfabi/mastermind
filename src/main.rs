@@ -1014,11 +1014,11 @@ mod mastermind_solver {
     /// this is needed in order to seprate the creation of the strategy step type from the
     /// iteration step.
     /// This allows parallelization by removing the borrow once it is initiated
-    enum CandidateOption<'a> {
-        raw { candidates: &'a Vec<CodeType> },
+    enum CandidateOption {
+        raw { candidates: Vec<CodeType> },
         instantiated { handler: CandidateHandlerType },
     }
-    impl CandidateOption<'_> {
+    impl CandidateOption {
         /// return MUTABLE reference to the CandidateHandler
         fn mutate(&mut self) -> &mut CandidateHandlerType {
             if let CandidateOption::instantiated { handler } = self {
@@ -1040,9 +1040,9 @@ mod mastermind_solver {
         }
 
         /// instantiate to replace the borrowed reference with the Candidate Handler
-        fn instantiate<'a>(&mut self, configuration: &'a ConfigType) -> CandidateOption<'static> {
+        fn instantiate<'a>(&mut self, configuration: &'a ConfigType) {
             if let CandidateOption::raw { candidates } = self {
-                return CandidateOption::instantiated {
+                *self = CandidateOption::instantiated {
                     handler: CandidateHandlerType::new(candidates, configuration),
                 };
             } else {
@@ -1060,16 +1060,16 @@ mod mastermind_solver {
     /// i.e. one of these steps could be next
     /// It links to several StrategyStepTypes
 
-    struct StrategyStepType<'a, 'b> {
+    struct StrategyStepType<'b> {
         counter: StrategyCounter,
-        candidate_option: CandidateOption<'a>,
+        candidate_option: CandidateOption,
         //next_options: Vec<u128>,
         next_options: HashMap<CodeType, Vec<u128>>,
         configuration: &'b ConfigType,
     }
-    impl StrategyStepType<'_, '_> {
+    impl StrategyStepType<'_> {
         ///initiate everything -> very first step
-        fn initiate_beginning<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c, 'c>
+        fn initiate_beginning<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c>
         where
             'a: 'c,
             'b: 'c,
@@ -1089,7 +1089,7 @@ mod mastermind_solver {
         fn new_ref<'a, 'b, 'c>(
             candidates: &'a Vec<CodeType>,
             configuration: &'b ConfigType,
-        ) -> StrategyStepType<'c, 'c>
+        ) -> StrategyStepType<'c>
         where
             'a: 'c,
             'b: 'c,
@@ -1097,7 +1097,7 @@ mod mastermind_solver {
             return StrategyStepType {
                 counter: StrategyCounter::Unfinished,
                 candidate_option: CandidateOption::raw {
-                    candidates: &candidates,
+                    candidates: candidates.clone(),
                 },
                 next_options: HashMap::new(),
                 configuration: &configuration,
@@ -1107,7 +1107,7 @@ mod mastermind_solver {
         fn new<'a, 'b, 'c>(
             candidates: &'a Vec<CodeType>,
             configuration: &'b ConfigType,
-        ) -> StrategyStepType<'c, 'c>
+        ) -> StrategyStepType<'c>
         where
             'a: 'c,
             'b: 'c,
@@ -1120,8 +1120,7 @@ mod mastermind_solver {
         /// convert all the candidate options from "raw" to "initiated"
         /// this costs some calculation time since all possible candidates are checked
         fn instantiate(&mut self) {
-            self.candidate_option = self.candidate_option.instantiate(self.configuration);
-            //self.candidate_option.instantiate(self.configuration); //maybe this could work also?? -> to be tested
+            self.candidate_option.instantiate(self.configuration);
         }
 
         /// add the ids as next options
@@ -1162,7 +1161,7 @@ mod mastermind_solver {
     /// All individual steps are stored in one giant hashmap
     struct StrategyHandler<'a, 'b> {
         id_generator: StepIDGenerator,
-        memory: HashMap<u128, StrategyStepType<'a, 'a>>,
+        memory: HashMap<u128, StrategyStepType<'a>>,
         configuration: &'b ConfigType,
         max_level: u8,
         current_level: u8,
