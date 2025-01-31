@@ -1040,9 +1040,9 @@ mod mastermind_solver {
         }
 
         /// instantiate to replace the borrowed reference with the Candidate Handler
-        fn instantiate<'a>(&mut self, configuration: &'a ConfigType) {
+        fn instantiate<'a>(&mut self, configuration: &'a ConfigType) -> CandidateOption<'static> {
             if let CandidateOption::raw { candidates } = self {
-                *self = CandidateOption::instantiated {
+                return CandidateOption::instantiated {
                     handler: CandidateHandlerType::new(candidates, configuration),
                 };
             } else {
@@ -1120,15 +1120,8 @@ mod mastermind_solver {
         /// convert all the candidate options from "raw" to "initiated"
         /// this costs some calculation time since all possible candidates are checked
         fn instantiate(&mut self) {
-            self.candidate_option.instantiate(self.configuration);
-
-            /* if let CandidateOption::raw { candidates } = self.candidate_option {
-                self.candidate_option = CandidateOption::instantiated {
-                    handler: (CandidateHandlerType::new(candidates, self.configuration)),
-                }
-            } else {
-                panic!("Strategy Step was already instantiated!!!")
-            } */
+            self.candidate_option = self.candidate_option.instantiate(self.configuration);
+            //self.candidate_option.instantiate(self.configuration); //maybe this could work also?? -> to be tested
         }
 
         /// add the ids as next options
@@ -1215,7 +1208,7 @@ mod mastermind_solver {
             } else {
                 panic!("no level boundaries")
             };
-            /*
+
             // 1. create the next level
             let next_level_creator = |handler: &mut StrategyStepType| {
                 for candidate_results in &handler.borrow().candidate_list {
@@ -1223,10 +1216,8 @@ mod mastermind_solver {
 
                     // add the id_range and the candidate to the StrategyStep
                     let new_id_range = self.id_generator.get_range(handler.borrow().len() as u16);
-                    for ((_, candidates), new_id) in candidate_results
-                        .result_hashmap
-                        .into_iter()
-                        .zip(new_id_range)
+                    for ((_, candidates), new_id) in
+                        candidate_results.result_hashmap.iter().zip(new_id_range)
                     {
                         self.memory.insert(
                             new_id,
@@ -1244,7 +1235,7 @@ mod mastermind_solver {
 
             // and save the boundaries of the last level
             let new_lvl_end = self.id_generator.get_highest();
-            self.level_keys.push((new_lvl_begin, new_lvl_end)); */
+            self.level_keys.push((new_lvl_begin, new_lvl_end));
 
             //outline:
         }
@@ -1402,30 +1393,69 @@ mod testing {
 
     #[test]
     fn lifetime_test() {
+        ///Struct that does not implement the Copy trait
         #[derive(Clone)]
         struct TestStruct {
             value: i32,
         }
 
-        enum Tester<'a> {
-            Before { reference: &'a TestStruct },
-            After { value: TestStruct },
+        /// Enum that can either borrow or Own a Test STruct
+        enum TestEnum<'a> {
+            Borrow { borrowed: &'a TestStruct },
+            Own { owned: TestStruct },
         }
-        impl Tester<'_> {
-            fn instantiate(&mut self) {
-                if let Tester::Before { reference: T } = self {
-                    *self = Tester::After { value: T.clone() };
+        impl TestEnum<'_> {
+            /// Convert borrowed to owned values
+            fn change_borrowed_to_owned(&mut self) {
+                if let TestEnum::Borrow { borrowed: t } = self {
+                    *self = TestEnum::Own {
+                        //owned: t.clone(), //does not work, still complains about the lifetime
+                        owned: t.to_owned(), //does not work, still complains about the lifetime
+                                             //owned: t.clone_into(), //does not make sense -> still need the original
+                    };
                 } else {
-                    panic!("CandidateOption is already instantiated")
+                    panic!("TestEnum already has Ownership")
+                }
+            }
+            /// Convert borrowed to owned values
+            fn change_borrowed_to_owned_v2(&mut self) -> TestEnum<'static> {
+                if let TestEnum::Borrow { borrowed: t } = self {
+                    return TestEnum::Own {
+                        owned: t.clone(), //does not work, still complains about the lifetime
+                                          //owned: t.to_owned(), //does not work, still complains about the lifetime
+                                          //owned: t.clone_into(), //does not make sense -> still need the original
+                    };
+                } else {
+                    panic!("TestEnum already has Ownership")
+                }
+            }
+
+            ///test output
+            fn print(self) {
+                match self {
+                    TestEnum::Own { owned: t } => println!("Owned value: {}", t.value),
+                    TestEnum::Borrow { borrowed: t } => println!("Borrowed value: {}", t.value),
                 }
             }
         }
 
-        let mut at = TestStruct { value: 2 };
+        // Input
+        let original_input = TestStruct { value: 2 };
+        let mut test_enum: TestEnum;
+        {
+            // assign a value to the enum
+            test_enum = TestEnum::Borrow {
+                borrowed: &original_input,
+            };
 
-        let bt = &at;
+            //convert to enum with ownership
+            test_enum = test_enum.change_borrowed_to_owned_v2();
+        }
 
-        let mut ae = Tester::Before { reference: bt };
+        // move the original input
+        let moved_input = original_input;
+
+        test_enum.print()
     }
 }
 
