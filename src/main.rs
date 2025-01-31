@@ -575,8 +575,9 @@ mod mastermind_solver {
                     },
                 };
             }
+            // the best case how this could be solved
             return StrategyCounter::Unfinished {
-                count: self.number_of_candidates as u16,
+                count: 2 * self.number_of_candidates as u16 - 1,
             };
         }
     }
@@ -603,7 +604,7 @@ mod mastermind_solver {
 
         assert!(matches!(
             result_handler.count(None),
-            StrategyCounter::Unfinished { count: 2 }
+            StrategyCounter::Unfinished { count: 9 }
         ));
 
         // example that should not be equal to above
@@ -784,6 +785,9 @@ mod mastermind_solver {
                     StrategyCounter::PartiallyFinished { count: number } => {
                         return count_overruler(self.count_storer, number as usize)
                     }
+                    StrategyCounter::Unfinished { count: number } => {
+                        return count_overruler(self.count_storer, number as usize)
+                    }
                     _ => return self.count_storer,
                 }
             }
@@ -893,6 +897,7 @@ mod mastermind_solver {
             let new_val = match candidate.count(Some(best_count as usize)) {
                 StrategyCounter::Done { count: number } => number,
                 StrategyCounter::PartiallyFinished { count: number } => number,
+                StrategyCounter::Unfinished { count: number } => number,
                 StrategyCounter::Obsolete => continue,
                 _ => {
                     continue;
@@ -940,7 +945,9 @@ mod mastermind_solver {
         let length = candidate_list.len() as u16;
         return (
             candidate_list,
-            StrategyCounter::Unfinished { count: length },
+            StrategyCounter::Unfinished {
+                count: 2 * length - 1,
+            },
         );
     }
 
@@ -959,6 +966,7 @@ mod mastermind_solver {
                     0 => StrategyCounter::Obsolete,
                     1 => StrategyCounter::Unfinished { count: 1 },
                     2..=5 => StrategyCounter::Done { count: x },
+                    13 => StrategyCounter::Unfinished { count: 13 }, // to check if this will be removed as obsolete
                     _ => StrategyCounter::PartiallyFinished { count: x },
                 };
                 if let Some(number) = max {
@@ -1011,6 +1019,13 @@ mod mastermind_solver {
         // should keep just the best done one
         assert_eq!(v, vec![]);
         assert_eq!(c, StrategyCounter::Obsolete);
+
+        // fifth test -> check if the count for "unfinished" works
+        v = vec![S { v: 8 }, S { v: 13 }, S { v: 3 }];
+        (v, c) = count_and_clean(v, None);
+        // should keep just the best done one
+        assert_eq!(v, vec![S { v: 3 }]);
+        assert_eq!(c, StrategyCounter::Done { count: 3 });
     }
 
     /// enum to calculate the number of entries for a strategy
