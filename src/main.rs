@@ -1107,9 +1107,9 @@ mod mastermind_solver {
     }
     impl StrategyStepType<'_> {
         ///initiate everything -> very first step
-        fn initiate_beginning<'a, 'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c>
+        fn initiate_beginning<'b, 'c>(configuration: &'b ConfigType) -> StrategyStepType<'c>
         where
-            'a: 'c,
+            //'a: 'c,
             'b: 'c,
         {
             let candidate_handler = CandidateHandlerType::instantiate(&configuration);
@@ -1124,7 +1124,7 @@ mod mastermind_solver {
             };
         }
         /// create a new Strategy Step type in the control flow based on a borrowed vector of CodeTypes
-        fn new_ref<'a, 'b, 'c>(
+        fn new_ref<'b, 'c>(
             candidates: Vec<CodeType>,
             configuration: &'b ConfigType,
         ) -> StrategyStepType<'c>
@@ -1213,7 +1213,10 @@ mod mastermind_solver {
     /// high level object to handle the strategy.
     /// It manages all the individual step types as well as the connections
     /// All individual steps are stored in one giant hashmap
-    struct StrategyHandler<'a, 'b> {
+    struct StrategyHandler<'a, 'b>
+    where
+        'b: 'a,
+    {
         id_generator: StepIDGenerator,
         memory: HashMap<u128, StrategyStepType<'a>>,
         configuration: &'b ConfigType,
@@ -1275,13 +1278,19 @@ mod mastermind_solver {
                 self.memory.insert(sst_id, handler);
             }
 
-            //(lvl_begin..lvl_end).map(self.memory)
-
             // and save the boundaries of the last level
             let new_lvl_end = self.id_generator.get_highest();
             self.level_keys.push((new_lvl_begin, new_lvl_end));
 
-            //outline:
+            // 2. instantiate the next level -> Heavy lifting!!!
+            for sst_id in new_lvl_begin..=new_lvl_end {
+                //remove the value and insert it in the end to avoid two mutable borrows at the same time
+                let mut handler = self.memory.remove(&sst_id).unwrap();
+                handler.instantiate();
+                //and insert again
+                self.memory.insert(sst_id, handler);
+            }
+            // 3.
         }
     }
 }
