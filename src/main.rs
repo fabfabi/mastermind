@@ -575,7 +575,9 @@ mod mastermind_solver {
                     },
                 };
             }
-            return StrategyCounter::Unfinished;
+            return StrategyCounter::Unfinished {
+                count: self.number_of_candidates as u16,
+            };
         }
     }
     #[test]
@@ -601,7 +603,7 @@ mod mastermind_solver {
 
         assert!(matches!(
             result_handler.count(None),
-            StrategyCounter::Unfinished
+            StrategyCounter::Unfinished { count: 2 }
         ));
 
         // example that should not be equal to above
@@ -661,7 +663,9 @@ mod mastermind_solver {
         pub fn new(candidates: &Vec<CodeType>, configuration: &ConfigType) -> Self {
             let mut result = CandidateHandlerType {
                 candidate_list: Vec::new(),
-                count_storer: StrategyCounter::Unfinished,
+                count_storer: StrategyCounter::Unfinished {
+                    count: 2 * candidates.len() as u16,
+                },
             };
             // if there are only a few candidates left, no more grading needed
             // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
@@ -825,7 +829,7 @@ mod mastermind_solver {
 
         cht.update_count_storer(None);
 
-        assert_eq!(cht.count(None), StrategyCounter::Unfinished);
+        assert_eq!(cht.count(None), StrategyCounter::Unfinished { count: 8 });
 
         //////////////////////////////////////////
         // now with only three as input
@@ -933,7 +937,11 @@ mod mastermind_solver {
                 StrategyCounter::PartiallyFinished { count: best_count },
             );
         }
-        return (candidate_list, StrategyCounter::Unfinished);
+        let length = candidate_list.len() as u16;
+        return (
+            candidate_list,
+            StrategyCounter::Unfinished { count: length },
+        );
     }
 
     #[test]
@@ -949,7 +957,7 @@ mod mastermind_solver {
             fn count(&self, max: Option<usize>) -> StrategyCounter {
                 let matcher = |x| match x {
                     0 => StrategyCounter::Obsolete,
-                    1 => StrategyCounter::Unfinished,
+                    1 => StrategyCounter::Unfinished { count: 1 },
                     2..=5 => StrategyCounter::Done { count: x },
                     _ => StrategyCounter::PartiallyFinished { count: x },
                 };
@@ -966,7 +974,7 @@ mod mastermind_solver {
         let s = S { v: 0 };
         assert_eq!(s.count(None), StrategyCounter::Obsolete);
         let s = S { v: 1 };
-        assert_eq!(s.count(None), StrategyCounter::Unfinished);
+        assert_eq!(s.count(None), StrategyCounter::Unfinished { count: 1 });
         let s = S { v: 2 };
         assert_eq!(s.count(None), StrategyCounter::Done { count: 2 });
         let s = S { v: 5 };
@@ -1010,7 +1018,7 @@ mod mastermind_solver {
     enum StrategyCounter {
         Start, // for the first node
         //Option,                           // several options for how to continue
-        Unfinished,                       // counting not yet done
+        Unfinished { count: u16 },        // counting not yet done
         PartiallyFinished { count: u16 }, //first count available
         Done { count: u16 },              // this strategy path finished already
         Obsolete,                         // This path has more moves than a known path
@@ -1113,9 +1121,9 @@ mod mastermind_solver {
             'b: 'c,
         {
             let candidate_handler = CandidateHandlerType::instantiate(&configuration);
-
+            let length = candidate_handler.candidate_list.len() as u16;
             return StrategyStepType {
-                counter: StrategyCounter::Unfinished,
+                counter: StrategyCounter::Unfinished { count: 2 * length },
                 candidate_option: CandidateOption::instantiated {
                     handler: candidate_handler,
                 },
@@ -1131,8 +1139,9 @@ mod mastermind_solver {
         where
             'b: 'c,
         {
+            let length = candidates.len() as u16;
             return StrategyStepType {
-                counter: StrategyCounter::Unfinished,
+                counter: StrategyCounter::Unfinished { count: 2 * length },
                 candidate_option: CandidateOption::raw {
                     candidates: candidates,
                 },
@@ -1207,7 +1216,10 @@ mod mastermind_solver {
         let mut sst = StrategyStepType::initiate_beginning(&config);
 
         sst.mutate().update_count_storer(None);
-        assert_eq!(sst.borrow().count_storer, StrategyCounter::Unfinished,)
+        assert_eq!(
+            sst.borrow().count_storer,
+            StrategyCounter::Unfinished { count: 4 },
+        )
     }
 
     /// high level object to handle the strategy.
@@ -1248,7 +1260,7 @@ mod mastermind_solver {
 
         /// create the next level
         /// 1. create the next level (serial)
-        /// 2. instantiate the next level (i.e. identify the best candidates)
+        /// 2. instantiate the next level (i.e. identify the best candidates) -> heavy lifting!!!
         /// 3. calculate the count (backwards from the last level to the highets one)
         /// 4. backward pass to delete all steps that are obsolete
         fn propagate(&mut self) {
@@ -1290,7 +1302,8 @@ mod mastermind_solver {
                 //and insert again
                 self.memory.insert(sst_id, handler);
             }
-            // 3.
+            // 3. calculate the count (backwards from the last level to the highets one)
+            // 4. backward pass to delete all steps that are obsolete
         }
     }
 }
