@@ -538,6 +538,11 @@ mod mastermind_solver {
 
             return true;
         }
+
+        ///return a vector of vectors of candidates
+        fn get_candidate_lists(&self) -> Vec<Vec<CodeType>> {
+            self.result_hashmap.values().map(|x| x.clone()).collect()
+        }
     }
     impl StrategyCounterTrait for CandidateResultType {
         ///execute the counting logic
@@ -726,6 +731,34 @@ mod mastermind_solver {
         fn update_count_storer(&mut self, max: Option<usize>) {
             (self.candidate_list, self.count_storer) =
                 count_and_clean(self.candidate_list.clone(), max)
+        }
+
+        ///identify next level candidates, add to the memory and return the next options as a hashmap
+        fn create_next_candidates<'a>(
+            &self,
+            id_generator: &mut StepIDGenerator,
+            memory: &mut HashMap<u128, StrategyStepType<'a>>,
+            configuration: &'a ConfigType,
+        ) -> HashMap<CodeType, std::ops::Range<u128>> {
+            let mut next_options = HashMap::new();
+            // for each individual candidate
+            for candidate_result in &self.candidate_list {
+                let id_start = id_generator.get_next();
+
+                // get the individual lists of candidates that will be consumed
+                let mut candidate_lists = candidate_result.get_candidate_lists();
+
+                // add the id_range and the candidate to the StrategyStep
+                let new_id_range = id_generator.get_range(candidate_lists.len() as u16);
+
+                for (candidates, new_id) in candidate_lists.iter_mut().zip(new_id_range) {
+                    memory.insert(new_id, StrategyStepType::new(candidates, &configuration));
+                }
+
+                let id_end = id_generator.get_highest();
+                next_options.insert(candidate_result.candidate.clone(), id_start..id_end);
+            }
+            return next_options;
         }
     }
     impl StrategyCounterTrait for CandidateHandlerType {
@@ -1003,6 +1036,11 @@ mod mastermind_solver {
         fn get_highest(&self) -> u128 {
             return self.max_id - 1;
         }
+
+        ///get the next id that will be used
+        fn get_next(&self) -> u128 {
+            return self.max_id;
+        }
     }
     #[test]
     fn test_idgenerator() {
@@ -1064,7 +1102,7 @@ mod mastermind_solver {
         counter: StrategyCounter,
         candidate_option: CandidateOption,
         //next_options: Vec<u128>,
-        next_options: HashMap<CodeType, Vec<u128>>,
+        next_options: HashMap<CodeType, std::ops::Range<u128>>,
         configuration: &'b ConfigType,
     }
     impl StrategyStepType<'_> {
@@ -1087,17 +1125,16 @@ mod mastermind_solver {
         }
         /// create a new Strategy Step type in the control flow based on a borrowed vector of CodeTypes
         fn new_ref<'a, 'b, 'c>(
-            candidates: &'a Vec<CodeType>,
+            candidates: Vec<CodeType>,
             configuration: &'b ConfigType,
         ) -> StrategyStepType<'c>
         where
-            'a: 'c,
             'b: 'c,
         {
             return StrategyStepType {
                 counter: StrategyCounter::Unfinished,
                 candidate_option: CandidateOption::raw {
-                    candidates: candidates.clone(),
+                    candidates: candidates,
                 },
                 next_options: HashMap::new(),
                 configuration: &configuration,
@@ -1109,10 +1146,9 @@ mod mastermind_solver {
             configuration: &'b ConfigType,
         ) -> StrategyStepType<'c>
         where
-            'a: 'c,
             'b: 'c,
         {
-            let mut sst = Self::new_ref(&candidates, &configuration);
+            let mut sst = Self::new_ref(candidates.clone(), &configuration);
             sst.instantiate();
             return sst;
         }
@@ -1126,8 +1162,9 @@ mod mastermind_solver {
         /// add the ids as next options
         fn add_ids(&mut self, candidate: &CodeType, id_range: std::ops::Range<u128>) {
             //let new_items = id_range.collect();
-            let id_vector = Vec::from_iter(id_range);
-            self.next_options.insert(candidate.clone(), id_vector);
+            //let id_vector = Vec::from_iter(id_range);
+            self.next_options
+                .insert(candidate.clone(), id_range.clone());
         }
         /// work with the candidate handler as mutable reference
         fn mutate(&mut self) -> &mut CandidateHandlerType {
@@ -1137,6 +1174,23 @@ mod mastermind_solver {
         /// borrow the candidate handler
         fn borrow<'a>(&'a self) -> &'a CandidateHandlerType {
             return self.candidate_option.borrow();
+        }
+
+        /// create the next candidates
+        fn create_next_candidates<'a, 'b>(
+            &mut self,
+            memory: &mut HashMap<u128, StrategyStepType<'a>>,
+            id_generator: &mut StepIDGenerator,
+            configuration: &'b ConfigType, // just for the lifetime
+        ) where
+            'b: 'a,
+        {
+            if let CandidateOption::instantiated { handler } = &mut self.candidate_option {
+                self.next_options =
+                    handler.create_next_candidates(id_generator, memory, configuration);
+            } else {
+                panic!("not yet instantiated")
+            }
         }
     }
 
@@ -1209,26 +1263,17 @@ mod mastermind_solver {
             };
 
             // 1. create the next level
-            let next_level_creator = |handler: &mut StrategyStepType| {
-                for candidate_results in &handler.borrow().candidate_list {
-                    let id_start = self.id_generator.get_highest() + 1;
-
-                    // add the id_range and the candidate to the StrategyStep
-                    let new_id_range = self.id_generator.get_range(handler.borrow().len() as u16);
-                    for ((_, candidates), new_id) in
-                        candidate_results.result_hashmap.iter().zip(new_id_range)
-                    {
-                        self.memory.insert(
-                            new_id,
-                            StrategyStepType::new(&candidates, &self.configuration),
-                        );
-                    }
-
-                    let id_end = self.id_generator.get_highest();
-                    handler.add_ids(&candidate_results.candidate, id_start..id_end);
-                    //handler.borrow().candidate_list.iter().map();
-                }
-            };
+            for sst_id in lvl_begin..=lvl_end {
+                //remove the value and insert it in the end to avoid two mutable borrows at the same time
+                let mut handler = self.memory.remove(&sst_id).unwrap();
+                handler.create_next_candidates(
+                    &mut self.memory,
+                    &mut self.id_generator,
+                    &self.configuration,
+                );
+                //and insert again
+                self.memory.insert(sst_id, handler);
+            }
 
             //(lvl_begin..lvl_end).map(self.memory)
 
