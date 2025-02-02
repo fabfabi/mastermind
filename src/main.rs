@@ -1,3 +1,4 @@
+use log::{debug, info, warn};
 use mastermind_mechanics::ConfigType;
 
 #[macro_use]
@@ -745,14 +746,16 @@ mod mastermind_solver {
             memory: &mut HashMap<u128, StrategyStepType<'a>>,
             configuration: &'a ConfigType,
         ) -> HashMap<CodeType, std::ops::Range<u128>> {
+            //use log::debug;
             let mut next_options = HashMap::new();
+            println!("adding {} candidates", &self.candidate_list.len());
             // for each individual candidate
             for candidate_result in &self.candidate_list {
                 let id_start = id_generator.get_next();
 
                 // get the individual lists of candidates that will be consumed
                 let mut candidate_lists = candidate_result.get_candidate_lists();
-
+                println!("adding {} individual sub-results", candidate_lists.len());
                 // add the id_range and the candidate to the StrategyStep
                 let new_id_range = id_generator.get_range(candidate_lists.len() as u16);
 
@@ -760,7 +763,7 @@ mod mastermind_solver {
                     memory.insert(new_id, StrategyStepType::new(candidates, &configuration));
                 }
 
-                let id_end = id_generator.get_highest();
+                let id_end = id_generator.get_highest() + 1; //add one to include the highest in the range!
                 next_options.insert(candidate_result.candidate.clone(), id_start..id_end);
             }
             return next_options;
@@ -1243,7 +1246,7 @@ mod mastermind_solver {
             let mut childrens_children: Vec<u128> = children
                 .clone()
                 .into_iter()
-                // flat_map does the recursive thins
+                // flat_map does the recursive things
                 .flat_map(|v| match memory.get(&v) {
                     Some(strategy_step) => strategy_step.get_all_child_steps(&memory),
                     _ => vec![],
@@ -1257,7 +1260,7 @@ mod mastermind_solver {
 
     #[test]
     fn test_strategysteptype() {
-        let config = ConfigType {
+        let configuration = ConfigType {
             colors: 2,
             columns: 2,
         };
@@ -1265,13 +1268,24 @@ mod mastermind_solver {
         //let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
         //assert_eq!(sst_one.counter, StrategyCounter::Unfinished);
 
-        let mut sst = StrategyStepType::initiate_beginning(&config);
+        let mut sst = StrategyStepType::initiate_beginning(&configuration);
 
         sst.mutate().update_count_storer(None);
         assert_eq!(
             sst.borrow().count_storer,
-            StrategyCounter::Unfinished { count: 4 },
-        )
+            StrategyCounter::Unfinished { count: 3 },
+        );
+        let mut memory: HashMap<u128, StrategyStepType> = HashMap::new();
+
+        assert_eq!(sst.get_all_child_steps(&memory), vec![]);
+
+        let mut id_generator = StepIDGenerator::new();
+
+        sst.create_next_candidates(&mut memory, &mut id_generator, &configuration);
+        let mut all_children = sst.get_all_child_steps(&memory).clone();
+        all_children.sort();
+        assert_eq!(all_children, vec![0, 1, 2, 3, 4, 5]);
+        assert!(false);
     }
 
     /// high level object to handle the strategy.
