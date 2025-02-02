@@ -1168,6 +1168,17 @@ mod mastermind_solver {
                 panic!("CandidateOption is already instantiated")
             }
         }
+
+        fn show(&self) {
+            match &self {
+                CandidateOption::instantiated { handler } => handler.show(),
+                CandidateOption::empty => println!("Empty Candidate Opion"),
+                CandidateOption::raw { candidates } => {
+                    println!("Raw Candidate Option with {} candidates", candidates.len())
+                }
+                _ => println!("unknown status"),
+            }
+        }
     }
 
     /// Structure to handle the strategy.
@@ -1283,6 +1294,10 @@ mod mastermind_solver {
                 }
                 _ => panic!("Candidate not yet instantiated!"),
             }
+        }
+
+        fn show(&self) {
+            self.candidate_option.show()
         }
 
         // return a vector containing all child steps
