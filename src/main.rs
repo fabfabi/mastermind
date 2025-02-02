@@ -1,5 +1,5 @@
-use log::{debug, info, warn};
 use mastermind_mechanics::ConfigType;
+use std::fmt;
 
 #[macro_use]
 extern crate fstrings;
@@ -43,6 +43,16 @@ mod mastermind_mechanics {
         fn string(&self) -> String {
             return f!("{p} {c}", p = &self.positions, c = &self.colors);
         }
+    }
+    impl fmt::Display for ResultType {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}{}", self.positions, self.colors)
+        }
+    }
+    #[test]
+    fn test_result_type() {
+        let r = ResultType::new(4, 1);
+        println!("{}", r);
     }
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     ///code for one single try
@@ -91,6 +101,17 @@ mod mastermind_mechanics {
             return self.entries.len();
         }
     }
+    impl fmt::Display for CodeType {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let entries_as_string = &self
+                .entries
+                .clone()
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<String>();
+            write!(f, "{}", entries_as_string)
+        }
+    }
     #[test]
     fn test_newCodeType_check() {
         let config = ConfigType {
@@ -120,6 +141,8 @@ mod mastermind_mechanics {
         assert!(CodeType::new_check(vec![1, 2, 3, 6], &config).is_err());
         //no input
         assert!(CodeType::new_check(Vec::new(), &config).is_err());
+
+        println!("{}", CodeType::new(vec![1, 2, 3, 4]));
     }
     ///grade a guess wrt a solution
     pub fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
@@ -526,6 +549,15 @@ mod mastermind_solver {
             }
         }
 
+        /// show a high-level summary
+        fn show(&self) {
+            println!(
+                "Candidate: '{}' with {} groups",
+                self.candidate,
+                self.result_hashmap.len()
+            );
+        }
+
         ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
         fn eq(&self, other: &Self) -> bool {
             if !other.num_results() == self.num_results() {
@@ -657,6 +689,7 @@ mod mastermind_solver {
     }
 
     /// class to identify the next inputs to test
+    /// After entering a list of candidates (that are open), this class finds all possible next inputs
     struct CandidateHandlerType {
         candidate_list: Vec<CandidateResultType>,
         count_storer: StrategyCounter,
@@ -694,6 +727,13 @@ mod mastermind_solver {
 
         /// check if a similar CandidateResult is already found
         fn contains_similar(&self, other_candidate_result: &CandidateResultType) -> bool {
+            /* // if this input was already given, then all codes will have the same result
+            if other_candidate_result.result_hashmap.len() == 1 {
+                let candidate = other_candidate_result.candidate;
+
+                return !() // check if there are more entries contained in this list
+            } */
+
             for code in self.candidate_list.iter() {
                 if code.eq(&other_candidate_result) {
                     return true;
@@ -768,6 +808,19 @@ mod mastermind_solver {
             }
             return next_options;
         }
+
+        fn show(&self) {
+            println!(
+                "CandidateHandler with {} candidates",
+                self.candidate_list.len()
+            );
+        }
+        fn show_details(&self) {
+            self.show();
+            for candidate in &self.candidate_list {
+                candidate.show();
+            }
+        }
     }
     impl StrategyCounterTrait for CandidateHandlerType {
         fn count(&self, max: Option<usize>) -> StrategyCounter {
@@ -836,7 +889,7 @@ mod mastermind_solver {
 
         cht.update_count_storer(None);
 
-        assert_eq!(cht.count(None), StrategyCounter::Unfinished { count: 8 });
+        assert_eq!(cht.count(None), StrategyCounter::Unfinished { count: 3 });
 
         //////////////////////////////////////////
         // now with only three as input
@@ -896,11 +949,12 @@ mod mastermind_solver {
         };
 
         // the loop has to be run twice if there is one that is done
+        // run for the first time to find the best value
         for candidate in candidate_list.iter() {
             let new_val = match candidate.count(Some(best_count as usize)) {
                 StrategyCounter::Done { count: number } => number,
                 StrategyCounter::PartiallyFinished { count: number } => number,
-                StrategyCounter::Unfinished { count: number } => number,
+                StrategyCounter::Unfinished { count: _ } => continue, //unfinished ones do not count
                 StrategyCounter::Obsolete => continue,
                 _ => {
                     continue;
@@ -1285,7 +1339,6 @@ mod mastermind_solver {
         let mut all_children = sst.get_all_child_steps(&memory).clone();
         all_children.sort();
         assert_eq!(all_children, vec![0, 1, 2, 3, 4, 5]);
-        assert!(false);
     }
 
     /// high level object to handle the strategy.
@@ -1615,6 +1668,15 @@ mod testing {
         let moved_input = original_input;
 
         test_enum.print()
+    }
+
+    #[test]
+    fn test_vec_to_string() {
+        let v = vec![1, 2, 3];
+        let s = &v.into_iter().map(|x| x.to_string()).collect::<String>();
+        println!("{}", s);
+
+        //let t = &v;
     }
 }
 
