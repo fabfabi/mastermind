@@ -1076,6 +1076,7 @@ mod mastermind_solver {
     /// iteration step.
     /// This allows parallelization by removing the borrow once it is initiated
     enum CandidateOption {
+        empty,
         raw { candidates: Vec<CodeType> },
         instantiated { handler: CandidateHandlerType },
     }
@@ -1216,6 +1217,42 @@ mod mastermind_solver {
                 panic!("not yet instantiated")
             }
         }
+
+        /// update the counter
+        fn update_counter(&mut self) {
+            match &self.candidate_option {
+                CandidateOption::instantiated { handler } => {
+                    self.counter = handler.count_storer.clone()
+                }
+                _ => panic!("Candidate not yet instantiated!"),
+            }
+        }
+
+        // return a vector containing all child steps
+        fn get_all_child_steps(&self, memory: &HashMap<u128, StrategyStepType>) -> Vec<u128> {
+            if self.next_options.is_empty() {
+                return vec![];
+            }
+
+            // convert a hashmap with ranges to a flat vector of numbers
+            let convert_to_vec = |v: &HashMap<CodeType, std::ops::Range<u128>>| {
+                v.values().cloned().flatten().collect::<Vec<_>>()
+            };
+            let mut children: Vec<u128> = convert_to_vec(&self.next_options);
+
+            let mut childrens_children: Vec<u128> = children
+                .clone()
+                .into_iter()
+                // flat_map does the recursive thins
+                .flat_map(|v| match memory.get(&v) {
+                    Some(strategy_step) => strategy_step.get_all_child_steps(&memory),
+                    _ => vec![],
+                })
+                .collect();
+            children.append(&mut childrens_children);
+
+            return children;
+        }
     }
 
     #[test]
@@ -1277,7 +1314,7 @@ mod mastermind_solver {
         /// 1. create the next level (serial)
         /// 2. instantiate the next level (i.e. identify the best candidates) -> heavy lifting!!!
         /// 3. calculate the count (backwards from the last level to the highets one)
-        /// 4. backward pass to delete all steps that are obsolete
+        /// 4. forward pass to delete all steps that are obsolete
         fn propagate(&mut self) {
             if self.current_level > self.max_level {
                 println!("last level reached");
@@ -1309,7 +1346,7 @@ mod mastermind_solver {
             let new_lvl_end = self.id_generator.get_highest();
             self.level_keys.push((new_lvl_begin, new_lvl_end));
 
-            // 2. instantiate the next level -> Heavy lifting!!!
+            // 2. instantiate the next level -> Heavy lifting!!! TODO ->
             for sst_id in new_lvl_begin..=new_lvl_end {
                 //remove the value and insert it in the end to avoid two mutable borrows at the same time
                 let mut handler = self.memory.remove(&sst_id).unwrap();
@@ -1317,13 +1354,40 @@ mod mastermind_solver {
                 //and insert again
                 self.memory.insert(sst_id, handler);
             }
+
             // 3. calculate the count (backwards from the last level to the highets one)
-            // 4. backward pass to delete all steps that are obsolete
+            for (focus_lvl_begin, focus_lvl_end) in self.level_keys.iter().rev() {
+                for sst_id in *focus_lvl_begin..=*focus_lvl_end {
+                    //remove the value and insert it in the end to avoid two mutable borrows at the same time
+                    let handler_option = self.memory.remove(&sst_id);
+                    let mut handler = match handler_option {
+                        None => continue,
+                        Some(handler) => handler,
+                    };
+                    handler.update_counter();
+
+                    //and insert again
+                    self.memory.insert(sst_id, handler);
+                }
+            }
+
+            /* let iterative_deleter = |sst_id: u128| {
+                let handler_option = self.memory.remove(&sst_id);
+                let handler = match handler_option {
+                    None => return,
+                    Some(handler) => handler,
+                };
+                for (_, id_range) in handler.next_options {
+                    id_range.map(|id| iterative_deleter(id))
+                }
+            }; */
+            // 4. forward pass to delete all steps that are obsolete
         }
     }
 }
 
 mod testing {
+    use std::collections::HashMap;
     use std::result::Iter;
 
     use crate::mastermind_mechanics::grade;
