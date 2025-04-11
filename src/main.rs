@@ -715,11 +715,15 @@ mod mastermind_solver {
 
             for code in all_candidates.iter() {
                 let new_candidate_result = CandidateResultType::new(&candidates, code);
-                if (new_candidate_result.num_results() > 1) // no benefit in checking candidate that does not increase information
-                    & (!result.contains_similar(&new_candidate_result))
-                {
-                    result.add(new_candidate_result)
+                // no benefit in checking candidate that does not increase information
+                if new_candidate_result.num_results() == 1 {
+                    continue;
                 }
+                if result.contains_similar(&new_candidate_result) {
+                    continue;
+                }
+
+                result.add(new_candidate_result)
             }
 
             return result;
@@ -788,14 +792,14 @@ mod mastermind_solver {
         ) -> HashMap<CodeType, std::ops::Range<u128>> {
             //use log::debug;
             let mut next_options = HashMap::new();
-            println!("adding {} candidates", &self.candidate_list.len());
+            //println!("adding {} candidates", &self.candidate_list.len());
             // for each individual candidate
             for candidate_result in &self.candidate_list {
                 let id_start = id_generator.get_next();
 
                 // get the individual lists of candidates that will be consumed
                 let mut candidate_lists = candidate_result.get_candidate_lists();
-                println!("adding {} individual sub-results", candidate_lists.len());
+                // println!("adding {} individual sub-results", candidate_lists.len());
                 // add the id_range and the candidate to the StrategyStep
                 let new_id_range = id_generator.get_range(candidate_lists.len() as u16);
 
@@ -803,7 +807,7 @@ mod mastermind_solver {
                     memory.insert(new_id, StrategyStepType::new(candidates, &configuration));
                 }
 
-                let id_end = id_generator.get_highest() + 1; //add one to include the highest in the range!
+                let id_end = id_generator.get_next(); //add one to include the highest in the range!
                 next_options.insert(candidate_result.candidate.clone(), id_start..id_end);
             }
             return next_options;
@@ -1114,6 +1118,7 @@ mod mastermind_solver {
 
         ///get the highest number used
         fn get_highest(&self) -> u128 {
+            // this could create a negative number. Do I need to pay attention for that?
             return self.max_id - 1;
         }
 
@@ -1126,9 +1131,12 @@ mod mastermind_solver {
     fn test_idgenerator() {
         let mut generator = StepIDGenerator::new();
         assert_eq!(generator.get_range(5), 0..5);
+        assert_eq!(generator.get_highest(), 4);
+        assert_eq!(generator.get_next(), 5);
         assert_eq!(generator.get_range(5), 5..10);
+        assert_eq!(generator.get_next(), 10);
     }
-    /// enum to contain either a borrow to a list of candidates or a candidate handler
+    /// enum to contain either a list of candidates or a candidate handler
     /// this is needed in order to seprate the creation of the strategy step type from the
     /// iteration step.
     /// This allows parallelization by removing the borrow once it is initiated
@@ -1371,10 +1379,10 @@ mod mastermind_solver {
         level_keys: Vec<(u128, u128)>,
     }
     impl StrategyHandler<'_, '_> {
-        pub fn new<'a>(confiuration: &'a ConfigType, max_level: u8) -> StrategyHandler<'a, 'a> {
+        pub fn new<'a>(configuration: &'a ConfigType, max_level: u8) -> StrategyHandler<'a, 'a> {
             let mut hashmap: HashMap<u128, StrategyStepType> = HashMap::new();
 
-            let step_handler = StrategyStepType::initiate_beginning(&confiuration);
+            let step_handler = StrategyStepType::initiate_beginning(&configuration);
             //retrieve the initial value as 0
             let mut id_generator = StepIDGenerator::new();
             id_generator.get_range(1);
@@ -1382,7 +1390,7 @@ mod mastermind_solver {
 
             let strategy_handler = StrategyHandler {
                 id_generator: id_generator,
-                configuration: &confiuration,
+                configuration: &configuration,
                 memory: hashmap,
                 max_level: max_level,
                 current_level: 0,
@@ -1405,6 +1413,10 @@ mod mastermind_solver {
                 self.cut_branch(child_id);
             }
         }
+
+        /// runs the full algorithm
+        /// verifies completeness by having only one candidate in the highest level in status "done"
+        fn solve(&mut self) {}
 
         /// create the next level
         /// 1. create the next level (serial)
@@ -1499,6 +1511,21 @@ mod mastermind_solver {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_strategyhandler() {
+        let configuration = ConfigType {
+            colors: 3,
+            columns: 3,
+        };
+
+        //let sst_one = StrategyStepType::new(&vec![CodeType::new(vec![0, 1])], &config);
+        //assert_eq!(sst_one.counter, StrategyCounter::Unfinished);
+
+        let mut sht = StrategyHandler::new(&configuration, 8);
+
+        sht.propagate() // -> panics...
     }
 }
 
