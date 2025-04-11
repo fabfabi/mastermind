@@ -1374,13 +1374,13 @@ mod mastermind_solver {
         pub fn new<'a>(confiuration: &'a ConfigType, max_level: u8) -> StrategyHandler<'a, 'a> {
             let mut hashmap: HashMap<u128, StrategyStepType> = HashMap::new();
 
-            let mut step_handler = StrategyStepType::initiate_beginning(&confiuration);
+            let step_handler = StrategyStepType::initiate_beginning(&confiuration);
             //retrieve the initial value as 0
             let mut id_generator = StepIDGenerator::new();
             id_generator.get_range(1);
             hashmap.insert(0 as u128, step_handler);
 
-            let mut strategy_handler = StrategyHandler {
+            let strategy_handler = StrategyHandler {
                 id_generator: id_generator,
                 configuration: &confiuration,
                 memory: hashmap,
@@ -1392,6 +1392,20 @@ mod mastermind_solver {
             return strategy_handler;
         }
 
+        /// recursively removes all children of one branch
+        fn cut_branch(&mut self, branch_id: u128) {
+            let branch = match self.memory.remove(&branch_id) {
+                Some(branch) => branch,
+                _ => return,
+            };
+
+            let all_child_steps = branch.get_all_child_steps(&self.memory);
+
+            for child_id in all_child_steps {
+                self.cut_branch(child_id);
+            }
+        }
+
         /// create the next level
         /// 1. create the next level (serial)
         /// 2. instantiate the next level (i.e. identify the best candidates) -> heavy lifting!!!
@@ -1400,7 +1414,7 @@ mod mastermind_solver {
         fn propagate(&mut self) {
             if self.current_level > self.max_level {
                 println!("last level reached");
-                panic!("done -> fix");
+                panic!("the solution was not found until last level -> fix");
             }
             // store the currently highest number
             let new_lvl_begin = self.id_generator.get_highest() + 1;
@@ -1410,7 +1424,7 @@ mod mastermind_solver {
             } else {
                 panic!("no level boundaries")
             };
-
+            //////////////////////////////////////////////////////////////////////////////////////
             // 1. create the next level
             for sst_id in lvl_begin..=lvl_end {
                 //remove the value and insert it in the end to avoid two mutable borrows at the same time
@@ -1428,7 +1442,8 @@ mod mastermind_solver {
             let new_lvl_end = self.id_generator.get_highest();
             self.level_keys.push((new_lvl_begin, new_lvl_end));
 
-            // 2. instantiate the next level -> Heavy lifting!!! TODO ->
+            //////////////////////////////////////////////////////////////////////////////////////
+            // 2. instantiate the next level -> Heavy lifting!!! TODO -> FEARLESS CONCURRENCY
             for sst_id in new_lvl_begin..=new_lvl_end {
                 //remove the value and insert it in the end to avoid two mutable borrows at the same time
                 let mut handler = self.memory.remove(&sst_id).unwrap();
@@ -1437,6 +1452,7 @@ mod mastermind_solver {
                 self.memory.insert(sst_id, handler);
             }
 
+            //////////////////////////////////////////////////////////////////////////////////////
             // 3. calculate the count (backwards from the last level to the highets one)
             for (focus_lvl_begin, focus_lvl_end) in self.level_keys.iter().rev() {
                 for sst_id in *focus_lvl_begin..=*focus_lvl_end {
@@ -1453,17 +1469,22 @@ mod mastermind_solver {
                 }
             }
 
-            /* let iterative_deleter = |sst_id: u128| {
-                let handler_option = self.memory.remove(&sst_id);
-                let handler = match handler_option {
-                    None => return,
-                    Some(handler) => handler,
-                };
-                for (_, id_range) in handler.next_options {
-                    id_range.map(|id| iterative_deleter(id))
-                }
-            }; */
+            //////////////////////////////////////////////////////////////////////////////////////
             // 4. forward pass to delete all steps that are obsolete
+            for (focus_lvl_begin, focus_lvl_end) in self.level_keys.iter() {
+                for sst_id in *focus_lvl_begin..=*focus_lvl_end {
+                    //remove the value and insert it in the end to avoid two mutable borrows at the same time
+                    let handler_option = self.memory.remove(&sst_id);
+                    let mut handler = match handler_option {
+                        None => continue,
+                        Some(handler) => handler,
+                    };
+                    handler.update_counter();
+
+                    //and insert again
+                    self.memory.insert(sst_id, handler);
+                }
+            }
         }
     }
 }
