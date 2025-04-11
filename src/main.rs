@@ -1300,8 +1300,8 @@ mod mastermind_solver {
             self.candidate_option.show()
         }
 
-        // return a vector containing all child steps
-        fn get_all_child_steps(&self, memory: &HashMap<u128, StrategyStepType>) -> Vec<u128> {
+        // return a vector containing all children including their children
+        fn get_all_children(&self, memory: &HashMap<u128, StrategyStepType>) -> Vec<u128> {
             if self.next_options.is_empty() {
                 return vec![];
             }
@@ -1317,7 +1317,7 @@ mod mastermind_solver {
                 .into_iter()
                 // flat_map does the recursive things
                 .flat_map(|v| match memory.get(&v) {
-                    Some(strategy_step) => strategy_step.get_all_child_steps(&memory),
+                    Some(strategy_step) => strategy_step.get_all_children(&memory),
                     _ => vec![],
                 })
                 .collect();
@@ -1346,12 +1346,12 @@ mod mastermind_solver {
         );
         let mut memory: HashMap<u128, StrategyStepType> = HashMap::new();
 
-        assert_eq!(sst.get_all_child_steps(&memory), vec![]);
+        assert_eq!(sst.get_all_children(&memory), vec![]);
 
         let mut id_generator = StepIDGenerator::new();
 
         sst.create_next_candidates(&mut memory, &mut id_generator, &configuration);
-        let mut all_children = sst.get_all_child_steps(&memory).clone();
+        let mut all_children = sst.get_all_children(&memory).clone();
         all_children.sort();
         assert_eq!(all_children, vec![0, 1, 2, 3, 4, 5]);
     }
@@ -1399,7 +1399,7 @@ mod mastermind_solver {
                 _ => return,
             };
 
-            let all_child_steps = branch.get_all_child_steps(&self.memory);
+            let all_child_steps = branch.get_all_children(&self.memory);
 
             for child_id in all_child_steps {
                 self.cut_branch(child_id);
@@ -1471,18 +1471,31 @@ mod mastermind_solver {
 
             //////////////////////////////////////////////////////////////////////////////////////
             // 4. forward pass to delete all steps that are obsolete
-            for (focus_lvl_begin, focus_lvl_end) in self.level_keys.iter() {
-                for sst_id in *focus_lvl_begin..=*focus_lvl_end {
-                    //remove the value and insert it in the end to avoid two mutable borrows at the same time
-                    let handler_option = self.memory.remove(&sst_id);
-                    let mut handler = match handler_option {
-                        None => continue,
-                        Some(handler) => handler,
-                    };
-                    handler.update_counter();
 
-                    //and insert again
+            // clone keys to avoid immutable borrow in order to be able to cut branches
+            let level_keys = self.level_keys.clone();
+
+            for (focus_lvl_begin, focus_lvl_end) in level_keys.iter() {
+                for sst_id in *focus_lvl_begin..=*focus_lvl_end {
+                    // remove the value and insert it in the end to avoid two mutable borrows at the same time
+                    let handler_option = self.memory.remove(&sst_id);
+                    let handler = match handler_option {
+                        Some(handler) => handler,
+                        None => continue,
+                    };
+
+                    // check if it is obsolete
+                    let cut_branch_bool = match handler.counter {
+                        StrategyCounter::Obsolete => true,
+                        _ => false,
+                    };
+
+                    // and insert again
                     self.memory.insert(sst_id, handler);
+
+                    if cut_branch_bool {
+                        self.cut_branch(sst_id);
+                    }
                 }
             }
         }
