@@ -113,7 +113,7 @@ mod mastermind_mechanics {
         }
     }
     #[test]
-    fn test_newCodeType_check() {
+    fn test_new_code_type_check() {
         let config = ConfigType {
             columns: 4,
             colors: 6,
@@ -1168,12 +1168,13 @@ mod mastermind_solver {
 
         /// instantiate to replace the borrowed reference with the Candidate Handler
         fn instantiate<'a>(&mut self, configuration: &'a ConfigType) {
+            //self.show();
             if let CandidateOption::raw { candidates } = self {
                 *self = CandidateOption::instantiated {
                     handler: CandidateHandlerType::new(candidates, configuration),
                 };
             } else {
-                panic!("CandidateOption is already instantiated")
+                println!("CandidateOption is already instantiated")
             }
         }
 
@@ -1446,7 +1447,7 @@ mod mastermind_solver {
                     &mut self.id_generator,
                     &self.configuration,
                 );
-                //and insert again
+                //and insert
                 self.memory.insert(sst_id, handler);
             }
 
@@ -1454,15 +1455,17 @@ mod mastermind_solver {
             let new_lvl_end = self.id_generator.get_highest();
             self.level_keys.push((new_lvl_begin, new_lvl_end));
 
-            //////////////////////////////////////////////////////////////////////////////////////
-            // 2. instantiate the next level -> Heavy lifting!!! TODO -> FEARLESS CONCURRENCY
-            for sst_id in new_lvl_begin..=new_lvl_end {
-                //remove the value and insert it in the end to avoid two mutable borrows at the same time
-                let mut handler = self.memory.remove(&sst_id).unwrap();
-                handler.instantiate();
-                //and insert again
-                self.memory.insert(sst_id, handler);
-            }
+            // Note: instantiating is not needed since step 1 instantiated directly
+            // enhancement for the future to use two steps for this
+            // //////////////////////////////////////////////////////////////////////////////////////
+            // // 2. instantiate the next level -> Heavy lifting!!! TODO -> FEARLESS CONCURRENCY
+            // for sst_id in new_lvl_begin..=new_lvl_end {
+            //     //remove the value and insert it in the end to avoid two mutable borrows at the same time
+            //     let mut handler = self.memory.remove(&sst_id).unwrap();
+            //     handler.instantiate();
+            //     //and insert again
+            //     self.memory.insert(sst_id, handler);
+            // }
 
             //////////////////////////////////////////////////////////////////////////////////////
             // 3. calculate the count (backwards from the last level to the highets one)
@@ -1525,7 +1528,9 @@ mod mastermind_solver {
 
         let mut sht = StrategyHandler::new(&configuration, 8);
 
-        sht.propagate() // -> panics...
+        sht.propagate(); // -> does not make sense yet
+
+        assert!(false)
     }
 }
 
