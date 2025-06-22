@@ -5,26 +5,27 @@ use crate::mastermind::mastermind_mechanics::CodeType;
 use crate::mastermind::mastermind_mechanics::ConfigType;
 use crate::mastermind::mastermind_mechanics::LineType;
 
-pub struct game<'a> {
+/// game for handling the basic io for the user
+pub struct Game<'a> {
     guesses: Vec<LineType>,
     solution: CodeType,
     configuration: &'a ConfigType,
 }
 
-impl<'a> game<'a> {
+impl<'a> Game<'a> {
     pub fn new(configuration: &'a ConfigType) -> Self {
         let solution = generate_code(&configuration);
         solution.print();
-        let mut gameplay = Self {
+        let gameplay = Self {
             guesses: Vec::<LineType>::new(),
             solution: solution,
             configuration: &configuration,
         };
-        gameplay.play();
+        //gameplay.play();
         return gameplay;
     }
     /// get new inputs until the solution was found
-    fn play(&mut self) {
+    pub fn play(&mut self) {
         loop {
             let done = self.guess();
             if done {

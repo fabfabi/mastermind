@@ -6,6 +6,6 @@ pub mod mastermind_io;
 mod mastermind_mechanics;
 pub mod mastermind_solver;
 
-pub use mastermind_gameplay::game;
+pub use mastermind_gameplay::Game;
 
 pub use mastermind_mechanics::ConfigType;
