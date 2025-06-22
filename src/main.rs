@@ -1419,27 +1419,22 @@ mod mastermind_solver {
         /// verifies completeness by having only one candidate in the highest level in status "done"
         fn solve(&mut self) {}
 
-        /// create the next level
-        /// 1. create the next level (serial)
-        /// 2. instantiate the next level (i.e. identify the best candidates) -> heavy lifting!!!
-        /// 3. calculate the count (backwards from the last level to the highets one)
-        /// 4. forward pass to delete all steps that are obsolete
-        fn propagate(&mut self) {
-            if self.current_level > self.max_level {
-                println!("last level reached");
-                panic!("the solution was not found until last level -> fix");
-            }
+        /// first tep of the propagation where the next level is created
+        /// TODO Enhancement for the future: lazy evaluation
+        fn create_next_level(&mut self) {
             // store the currently highest number
-            let new_lvl_begin = self.id_generator.get_highest() + 1;
+            let level_begin_next = self.id_generator.get_highest() + 1;
 
-            let (lvl_begin, lvl_end) = if let Some(&tuple) = self.level_keys.last() {
-                tuple
-            } else {
-                panic!("no level boundaries")
-            };
+            // get the keys from the last level. This will be propagated
+            let (level_begin_current, level_end_current) =
+                if let Some(&tuple) = self.level_keys.last() {
+                    tuple
+                } else {
+                    panic!("no level boundaries")
+                };
             //////////////////////////////////////////////////////////////////////////////////////
             // 1. create the next level
-            for sst_id in lvl_begin..=lvl_end {
+            for sst_id in level_begin_current..=level_end_current {
                 //remove the value and insert it in the end to avoid two mutable borrows at the same time
                 let mut handler = self.memory.remove(&sst_id).unwrap();
                 handler.create_next_candidates(
@@ -1452,23 +1447,12 @@ mod mastermind_solver {
             }
 
             // and save the boundaries of the last level
-            let new_lvl_end = self.id_generator.get_highest();
-            self.level_keys.push((new_lvl_begin, new_lvl_end));
+            let level_end_next = self.id_generator.get_highest();
+            self.level_keys.push((level_begin_next, level_end_next));
+        }
 
-            // Note: instantiating is not needed since step 1 instantiated directly
-            // enhancement for the future to use two steps for this
-            // //////////////////////////////////////////////////////////////////////////////////////
-            // // 2. instantiate the next level -> Heavy lifting!!! TODO -> FEARLESS CONCURRENCY
-            // for sst_id in new_lvl_begin..=new_lvl_end {
-            //     //remove the value and insert it in the end to avoid two mutable borrows at the same time
-            //     let mut handler = self.memory.remove(&sst_id).unwrap();
-            //     handler.instantiate();
-            //     //and insert again
-            //     self.memory.insert(sst_id, handler);
-            // }
-
-            //////////////////////////////////////////////////////////////////////////////////////
-            // 3. calculate the count (backwards from the last level to the highets one)
+        /// 3. calculate the count for all candidates
+        fn calculate_count(&mut self) {
             for (focus_lvl_begin, focus_lvl_end) in self.level_keys.iter().rev() {
                 for sst_id in *focus_lvl_begin..=*focus_lvl_end {
                     //remove the value and insert it in the end to avoid two mutable borrows at the same time
@@ -1483,10 +1467,10 @@ mod mastermind_solver {
                     self.memory.insert(sst_id, handler);
                 }
             }
+        }
 
-            //////////////////////////////////////////////////////////////////////////////////////
-            // 4. forward pass to delete all steps that are obsolete
-
+        /// 4. delete obsolete steps
+        fn delete_obsolete(&mut self) {
             // clone keys to avoid immutable borrow in order to be able to cut branches
             let level_keys = self.level_keys.clone();
 
@@ -1513,6 +1497,42 @@ mod mastermind_solver {
                     }
                 }
             }
+        }
+
+        /// create the next level
+        /// 1. create the next level (serial)
+        /// 2. instantiate the next level (i.e. identify the best candidates) -> heavy lifting!!!
+        /// 3. calculate the count (backwards from the last level to the highets one)
+        /// 4. forward pass to delete all steps that are obsolete
+        fn propagate(&mut self) {
+            if self.current_level > self.max_level {
+                println!("last level reached");
+                panic!("the solution was not found until last level -> fix");
+            }
+            // chop it into several functions in order to test it individually
+            //////////////////////////////////////////////////////////////////////////////////////
+            // 1. Create the next level
+            self.create_next_level();
+
+            // Note: instantiating is not needed since step 1 instantiated directly
+            // enhancement for the future to use two steps for this
+            // //////////////////////////////////////////////////////////////////////////////////////
+            // // 2. instantiate the next level -> Heavy lifting!!! TODO -> FEARLESS CONCURRENCY
+            // for sst_id in new_lvl_begin..=new_lvl_end {
+            //     //remove the value and insert it in the end to avoid two mutable borrows at the same time
+            //     let mut handler = self.memory.remove(&sst_id).unwrap();
+            //     handler.instantiate();
+            //     //and insert again
+            //     self.memory.insert(sst_id, handler);
+            // }
+
+            //////////////////////////////////////////////////////////////////////////////////////
+            // 3. calculate the count (backwards from the last level to the highets one)
+            self.calculate_count();
+
+            //////////////////////////////////////////////////////////////////////////////////////
+            // 4. forward pass to delete all steps that are obsolete
+            self.delete_obsolete();
         }
     }
 
