@@ -171,39 +171,3 @@ pub enum StrategyCounter {
     Obsolete,                         // This path has more moves than a known path
                                       //End,                              // this is the last node of the strategy
 }
-
-///simple struct to generate IDs for every new step
-pub struct StepIDGenerator {
-    max_id: u128,
-}
-impl StepIDGenerator {
-    fn new() -> Self {
-        StepIDGenerator { max_id: 0 }
-    }
-    /// return a range of 'n' IDs
-    fn get_range(&mut self, n: u16) -> std::ops::Range<u128> {
-        let number = self.max_id.clone();
-        self.max_id += n as u128;
-        return number..self.max_id;
-    }
-
-    ///get the highest number used
-    fn get_highest(&self) -> u128 {
-        // this could create a negative number. Do I need to pay attention for that?
-        return self.max_id - 1;
-    }
-
-    ///get the next id that will be used
-    fn get_next(&self) -> u128 {
-        return self.max_id;
-    }
-}
-#[test]
-fn test_idgenerator() {
-    let mut generator = StepIDGenerator::new();
-    assert_eq!(generator.get_range(5), 0..5);
-    assert_eq!(generator.get_highest(), 4);
-    assert_eq!(generator.get_next(), 5);
-    assert_eq!(generator.get_range(5), 5..10);
-    assert_eq!(generator.get_next(), 10);
-}

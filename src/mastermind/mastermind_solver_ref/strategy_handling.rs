@@ -1,3 +1,6 @@
+/// old code to use as a reference.
+/// The data structure is bad (global hashmap) some aspects might be re-used
+/// Going for a directed graph (one node contains all its children)
 // use crate::mastermind::mastermind_mechanics::get_all_codes;
 // use crate::mastermind::mastermind_mechanics::grade;
 use crate::mastermind::mastermind_mechanics::CodeType;
