@@ -171,3 +171,10 @@ pub enum StrategyCounter {
     Obsolete,                         // This path has more moves than a known path
                                       //End,                              // this is the last node of the strategy
 }
+impl StrategyCounter {
+    pub fn new(n_candidates: usize) -> Self {
+        return Self::Unfinished {
+            count: 2 * n_candidates as u16,
+        };
+    }
+}

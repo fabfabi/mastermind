@@ -23,7 +23,7 @@ enum CandidateResultHashmap {
 impl CandidateResultHashmap {
     pub fn create_next_candidates<'a>(&mut self, configuration: &'a ConfigType) {
         match self {
-            CandidateResultHashmap::NEW(hashmap) => {
+            Self::NEW(hashmap) => {
                 let mut hashmap_new: HashMap<ResultType, CandidateHandlerType> = HashMap::new();
                 // this is triggering the heavy lifting
                 // this could move to a par_iter...
@@ -34,9 +34,9 @@ impl CandidateResultHashmap {
                     );
                 });
 
-                *self = CandidateResultHashmap::DONE(hashmap_new)
+                *self = Self::DONE(hashmap_new)
             }
-            CandidateResultHashmap::DONE(hashmap) => {
+            Self::DONE(hashmap) => {
                 hashmap
                     .values_mut()
                     .for_each(|x| x.propagate_next_level(configuration));
@@ -46,19 +46,19 @@ impl CandidateResultHashmap {
     /// verify if the hashmap contains the other_result already
     pub fn contains(&self, other_result: &ResultType) -> bool {
         return match self {
-            CandidateResultHashmap::NEW(hm) => hm.contains_key(other_result),
-            CandidateResultHashmap::DONE(hm) => hm.contains_key(other_result),
+            Self::NEW(hm) => hm.contains_key(other_result),
+            Self::DONE(hm) => hm.contains_key(other_result),
         };
     }
     /// return the number of results
     pub fn num_results(&self) -> usize {
         return match self {
-            CandidateResultHashmap::NEW(hm) => hm.keys().len(),
-            CandidateResultHashmap::DONE(hm) => hm.keys().len(),
+            Self::NEW(hm) => hm.keys().len(),
+            Self::DONE(hm) => hm.keys().len(),
         };
     }
     pub fn num_entries(&self, result: &ResultType) -> usize {
-        if let CandidateResultHashmap::NEW(hm) = self {
+        if let Self::NEW(hm) = self {
             if let Some(entries) = hm.get(result) {
                 return entries.len();
             }
@@ -68,7 +68,7 @@ impl CandidateResultHashmap {
 
     /// compare two CandidateResultHashmaps
     pub fn eq(&self, other: &Self) -> bool {
-        if let CandidateResultHashmap::NEW(hm) = self {
+        if let Self::NEW(hm) = self {
             if !other.num_results() == self.num_results() {
                 return false;
             }
@@ -277,9 +277,7 @@ impl CandidateHandlerType {
     pub fn create_next_candidates(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
-            count_storer: StrategyCounter::Unfinished {
-                count: 2 * candidates.len() as u16,
-            },
+            count_storer: StrategyCounter::new(candidates.len()),
         };
         // if there are only a few candidates left, no more grading needed
         // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
@@ -290,6 +288,8 @@ impl CandidateHandlerType {
             result.add(new_candidate_result);
             return result;
         }
+        // this one should move to become either a static variable
+        // or some static method from configuration so this is loaded once and then just returned
         let ALL_CANDIDATES = get_all_codes(configuration);
 
         for code in ALL_CANDIDATES.iter() {
@@ -383,8 +383,8 @@ impl StrategyCounterTrait for CandidateHandlerType {
         // unpack the maximum
         if let Some(given_max_number) = max {
             //matcher to overrule to obsolete if a better strategy has been found
-            let count_overruler = |t: StrategyCounter, num: usize| {
-                if num >= given_max_number {
+            let count_overruler = |t: StrategyCounter, num: u16| {
+                if num as usize >= given_max_number {
                     return StrategyCounter::Obsolete;
                 }
                 return t;
@@ -392,13 +392,13 @@ impl StrategyCounterTrait for CandidateHandlerType {
             // and match to the current count
             match self.count_storer {
                 StrategyCounter::Done { count: number } => {
-                    return count_overruler(self.count_storer, number as usize)
+                    return count_overruler(self.count_storer, number)
                 }
                 StrategyCounter::PartiallyFinished { count: number } => {
-                    return count_overruler(self.count_storer, number as usize)
+                    return count_overruler(self.count_storer, number)
                 }
                 StrategyCounter::Unfinished { count: number } => {
-                    return count_overruler(self.count_storer, number as usize)
+                    return count_overruler(self.count_storer, number)
                 }
                 _ => return self.count_storer,
             }
