@@ -17,47 +17,45 @@ use std::collections::HashMap;
 /// In the first step this is just the hashmap with ResultType -> Vec<CodeType>
 /// In the second step this is the hashmap with ResultType -> Vec<CandidateResultType>
 enum CandidateResultHashmap {
-    new(HashMap<ResultType, Vec<CodeType>>),
-    done(HashMap<ResultType, Vec<CandidateHandlerType>>),
+    NEW(HashMap<ResultType, Vec<CodeType>>),
+    DONE(HashMap<ResultType, CandidateHandlerType>),
 }
 impl CandidateResultHashmap {
-    pub fn create_next_candidates(&mut self, configuration: &'a ConfigType) {
+    pub fn create_next_candidates<'a>(&mut self, configuration: &'a ConfigType) {
         match self {
-            CandidateResultHashmap::new(hashmap) => {
-                self = CandidateHandlerType::done(
-                    hashmap
-                        .drain()
-                        .iter()
-                        .for_each(|(k, c)| (k, CandidateHandlerType::new(c, configuration))),
-                )
+            CandidateResultHashmap::NEW(hashmap) => {
+                let mut hashmap_new: HashMap<ResultType, CandidateHandlerType> = HashMap::new();
+                hashmap.drain().for_each(|(k, v)| {
+                    hashmap_new.insert(k, CandidateHandlerType::new(v, &configuration));
+                });
+
+                *self = CandidateResultHashmap::DONE(hashmap_new)
             }
-            CandidateResultHashmap::done(hashmap) => {
-                todo!();
+            CandidateResultHashmap::DONE(hashmap) => {
                 hashmap
-                    .iter_mut()
+                    .values_mut()
                     .for_each(|x| x.create_next_candidates(configuration));
             }
         }
     }
     /// verify if the hashmap contains the other_result already
     pub fn contains(&self, other_result: &ResultType) -> bool {
-        // ther must be a way to write this more concise
-
         return match self {
-            CandidateResultHashmap::new(hm) => hm.contains_key(other_result),
-            CandidateResultHashmap::done(hm) => hm.contains_key(other_result),
+            CandidateResultHashmap::NEW(hm) => hm.contains_key(other_result),
+            CandidateResultHashmap::DONE(hm) => hm.contains_key(other_result),
         };
     }
+    /// return the number of results
     pub fn num_results(&self) -> usize {
         return match self {
-            CandidateResultHashmap::new(hm) => hm.keys().len(),
-            CandidateResultHashmap::done(hm) => hm.keys().len(),
+            CandidateResultHashmap::NEW(hm) => hm.keys().len(),
+            CandidateResultHashmap::DONE(hm) => hm.keys().len(),
         };
     }
 }
 
 /// class to handle the results of one candidate
-#[derive(Clone)]
+// #[derive(Clone)]
 struct CandidateResultType {
     result_hashmap: CandidateResultHashmap,
     pub candidate: CodeType,
@@ -76,7 +74,7 @@ impl CandidateResultType {
         }
 
         return CandidateResultType {
-            result_hashmap: CandidateResultHashmap::new(map),
+            result_hashmap: CandidateResultHashmap::NEW(map),
             candidate: solution.clone(),
             //counter: StrategyCounter::Unfinished,
             number_of_candidates: guesses.len(),
@@ -253,7 +251,7 @@ pub struct CandidateHandlerType {
     count_storer: StrategyCounter,
 }
 impl CandidateHandlerType {
-    pub fn new(candidates: &Vec<CodeType>, configuration: &ConfigType) -> Self {
+    pub fn new(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
             count_storer: StrategyCounter::Unfinished {
