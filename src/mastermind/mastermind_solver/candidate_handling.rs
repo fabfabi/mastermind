@@ -52,6 +52,29 @@ impl CandidateResultHashmap {
             CandidateResultHashmap::DONE(hm) => hm.keys().len(),
         };
     }
+    pub fn num_entries(&self, result: &ResultType) -> usize {
+        if let CandidateResultHashmap::NEW(hm) = self {
+            if let Some(entries) = hm.get(result) {
+                return entries.len();
+            }
+        }
+        return 0;
+    }
+
+    /// compare two CandidateResultHashmaps
+    pub fn eq(&self, other: &Self) -> bool {
+        if let CandidateResultHashmap::NEW(hm) = self {
+            if !other.num_results() == self.num_results() {
+                return false;
+            }
+            for (result, entries) in hm {
+                if entries.len() != other.num_entries(&result) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 }
 
 /// class to handle the results of one candidate
@@ -63,14 +86,16 @@ struct CandidateResultType {
     number_of_candidates: usize,
 }
 impl CandidateResultType {
-    fn new(guesses: Vec<CodeType>, solution: &CodeType) -> Self {
+    /// create a new result.
+    /// Note, this is done plenty of times, and non-valueadding ones are scrapped
+    fn new(guesses: &Vec<CodeType>, solution: &CodeType) -> Self {
         let mut map: HashMap<ResultType, Vec<CodeType>> = HashMap::new();
 
         for guess in guesses.iter() {
             let result = grade(&guess, &solution);
             map.entry(result)
                 .or_insert_with(|| Vec::<CodeType>::new())
-                .push(guess.clone()); //how would this work without the "clone"?
+                .push(guess.clone()); //how would this work without the "clone" --> NO?
         }
 
         return CandidateResultType {
@@ -81,24 +106,20 @@ impl CandidateResultType {
         };
     }
 
-    // ///returns if a given result is present in that hashmap
-    // fn contains(&self, other_result: &ResultType) -> bool {
-    //     self.result_hashmap.contains(other_result)
-    // }
+    ///returns if a given result is present in that hashmap
+    fn contains(&self, other_result: &ResultType) -> bool {
+        self.result_hashmap.contains(other_result)
+    }
 
-    // ///returns the overall number of different results
-    // fn num_results(&self) -> usize {
-    //     return self.result_hashmap.num_results;
-    // }
+    ///returns the overall number of different results
+    fn num_results(&self) -> usize {
+        return self.result_hashmap.num_results();
+    }
 
-    // ///returns the number of entries for a given result
-    // fn num_entries(&self, result: &ResultType) -> usize {
-    //     if let Some(entries) = self.result_hashmap.get(result) {
-    //         return entries.len();
-    //     } else {
-    //         return 0;
-    //     }
-    // }
+    ///returns the number of entries for a given result
+    fn num_entries(&self, result: &ResultType) -> usize {
+        self.result_hashmap.num_entries(result)
+    }
 
     // /// show a high-level summary
     // fn show(&self) {
@@ -109,19 +130,10 @@ impl CandidateResultType {
     //     );
     // }
 
-    // ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
-    // fn eq(&self, other: &Self) -> bool {
-    //     if !other.num_results() == self.num_results() {
-    //         return false;
-    //     }
-    //     for (result, entries) in &self.result_hashmap {
-    //         if entries.len() != other.num_entries(&result) {
-    //             return false;
-    //         }
-    //     }
-
-    //     return true;
-    // }
+    ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
+    fn eq(&self, other: &Self) -> bool {
+        return self.result_hashmap.eq(&other.result_hashmap);
+    }
 
     // ///return a vector of vectors of candidates
     // fn get_candidate_lists(&self) -> Vec<Vec<CodeType>> {
@@ -251,7 +263,8 @@ pub struct CandidateHandlerType {
     count_storer: StrategyCounter,
 }
 impl CandidateHandlerType {
-    pub fn new(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
+    ///creates the next level of candidates. This function triggers the heavy lifting
+    pub fn create_next_candidates(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
             count_storer: StrategyCounter::Unfinished {
@@ -267,9 +280,9 @@ impl CandidateHandlerType {
             result.add(new_candidate_result);
             return result;
         }
-        let all_candidates = get_all_codes(configuration);
+        let ALL_CANDIDATES = get_all_codes(configuration);
 
-        for code in all_candidates.iter() {
+        for code in ALL_CANDIDATES.iter() {
             let new_candidate_result = CandidateResultType::new(&candidates, code);
             // no benefit in checking candidate that does not increase information
             if new_candidate_result.num_results() == 1 {
@@ -285,22 +298,22 @@ impl CandidateHandlerType {
         return result;
     }
 
-    // /// check if a similar CandidateResult is already found
-    // fn contains_similar(&self, other_candidate_result: &CandidateResultType) -> bool {
-    //     /* // if this input was already given, then all codes will have the same result
-    //     if other_candidate_result.result_hashmap.len() == 1 {
-    //         let candidate = other_candidate_result.candidate;
+    /// check if a similar CandidateResult is already found
+    fn contains_similar(&self, other_candidate_result: &CandidateResultType) -> bool {
+        /* // if this input was already given, then all codes will have the same result
+        if other_candidate_result.result_hashmap.len() == 1 {
+            let candidate = other_candidate_result.candidate;
 
-    //         return !() // check if there are more entries contained in this list
-    //     } */
-    //     for code in self.candidate_list.iter() {
-    //         if code.eq(&other_candidate_result) {
-    //             return true;
-    //         }
-    //     }
+            return !() // check if there are more entries contained in this list
+        } */
+        for code in self.candidate_list.iter() {
+            if code.eq(&other_candidate_result) {
+                return true;
+            }
+        }
 
-    //     return false;
-    // }
+        return false;
+    }
 
     // /// return the number of candidates found
     // fn len(&self) -> usize {
@@ -317,10 +330,10 @@ impl CandidateHandlerType {
     //     return false;
     // }
 
-    // /// adds a candidate to the list
-    // fn add(&mut self, candidate: CandidateResultType) {
-    //     self.candidate_list.push(candidate)
-    // }
+    /// adds a candidate to the list
+    fn add(&mut self, candidate: CandidateResultType) {
+        self.candidate_list.push(candidate)
+    }
 
     // /// if this is the last entry, i.e. only one candidate left
     // fn is_done(&self) -> bool {
