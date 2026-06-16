@@ -179,7 +179,7 @@ pub fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
 pub fn generate_code(configuration: &ConfigType) -> CodeType {
     let mut raw_code = Vec::new();
     for _ in 0..configuration.columns {
-        raw_code.push(rand::thread_rng().gen_range(0..configuration.colors));
+        raw_code.push(rand::rng().random_range(0..configuration.colors));
     }
     CodeType::new(raw_code)
 }
