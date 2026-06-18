@@ -163,10 +163,8 @@ fn test_count_and_clean() {
 /// enum to calculate the number of entries for a strategy
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub enum StrategyCounter {
-    Start, // for the first node
-    //Option,                           // several options for how to continue
     Unfinished { count: u16 },        // counting not yet done
-    PartiallyFinished { count: u16 }, //first count available
+    PartiallyFinished { count: u16 }, // first count available
     Done { count: u16 },              // this strategy path finished already
     Obsolete,                         // This path has more moves than a known path
                                       //End,                              // this is the last node of the strategy
@@ -177,4 +175,22 @@ impl StrategyCounter {
             count: 2 * n_candidates as u16,
         };
     }
+    pub fn get_count(&self) -> Option<u16> {
+        return match self {
+            Self::PartiallyFinished { count } => Some(*count),
+            Self::Done { count } => Some(*count),
+            _ => None,
+        };
+    }
+}
+
+#[test]
+fn test_vec_option() {
+    let v: Vec<i32> = vec![1, 2, 3, 4];
+    let v2: Vec<i32> = v
+        .iter()
+        .filter_map(|x| if *x > 2 { Some(*x) } else { None })
+        .collect();
+
+    println!("done")
 }

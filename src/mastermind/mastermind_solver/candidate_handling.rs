@@ -16,11 +16,19 @@ use std::collections::HashMap;
 ///
 /// In the first step this is just the hashmap with ResultType -> Vec<CodeType>
 /// In the second step this is the hashmap with ResultType -> Vec<CandidateResultType>
+///
+/// Note: this seems to be a good example for a TypeState pattern.
+/// Unfortunately a TypeState Pattern will require a Statemachine to be type-safe
+/// which is introducing more boilerplate than it resolves.
+/// see: https://users.rust-lang.org/t/how-to-implement-typestate-instead-of-enums-for/140769
 enum CandidateResultHashmap {
     NEW(HashMap<ResultType, Vec<CodeType>>),
     DONE(HashMap<ResultType, CandidateHandlerType>),
 }
 impl CandidateResultHashmap {
+    /// Create the next level of candidates.
+    ///
+    /// IMPORTANT: This function contains the entire logic and also needs to cover when to stop propagating.
     pub fn create_next_candidates<'a>(&mut self, configuration: &'a ConfigType) {
         match self {
             Self::NEW(hashmap) => {
@@ -57,6 +65,8 @@ impl CandidateResultHashmap {
             Self::DONE(hm) => hm.keys().len(),
         };
     }
+
+    /// number of the candidates for one specific result
     pub fn num_entries(&self, result: &ResultType) -> usize {
         if let Self::NEW(hm) = self {
             if let Some(entries) = hm.get(result) {
@@ -67,6 +77,7 @@ impl CandidateResultHashmap {
     }
 
     /// compare two CandidateResultHashmaps
+    /// These are defined same if there are same numbers of candidates behind the same results
     pub fn eq(&self, other: &Self) -> bool {
         if let Self::NEW(hm) = self {
             if !other.num_results() == self.num_results() {
@@ -80,6 +91,12 @@ impl CandidateResultHashmap {
         }
         return true;
     }
+    pub fn count(&mut self) -> StrategyCounter {
+        return match self {
+            Self::NEW(hm) => {}
+            Self::DONE(hm) => {}
+        };
+    }
 }
 
 /// class to handle the results of one candidate
@@ -87,7 +104,7 @@ impl CandidateResultHashmap {
 struct CandidateResultType {
     result_hashmap: CandidateResultHashmap,
     pub candidate: CodeType,
-    //pub counter: StrategyCounter,
+    pub counter: StrategyCounter,
     number_of_candidates: usize,
 }
 impl CandidateResultType {
@@ -103,11 +120,12 @@ impl CandidateResultType {
                 .push(guess.clone()); //how would this work without the "clone" --> NO?
         }
 
+        let n_candidates = guesses.len();
         return CandidateResultType {
             result_hashmap: CandidateResultHashmap::NEW(map),
             candidate: solution.clone(),
-            //counter: StrategyCounter::Unfinished,
-            number_of_candidates: guesses.len(),
+            counter: StrategyCounter::new(n_candidates),
+            number_of_candidates: n_candidates,
         };
     }
 
@@ -129,6 +147,12 @@ impl CandidateResultType {
     ///returns the number of entries for a given result
     fn num_entries(&self, result: &ResultType) -> usize {
         self.result_hashmap.num_entries(result)
+    }
+    /// executing the count and update the counter
+    pub fn count(&mut self) -> &StrategyCounter {
+        self.counter = self.result_hashmap.count();
+
+        return &self.counter;
     }
 
     // /// show a high-level summary
@@ -155,43 +179,44 @@ impl CandidateResultType {
     //     self.result_hashmap.create_next_candidates(configuration)
     // }
 }
-impl StrategyCounterTrait for CandidateResultType {
-    ///execute the counting logic
-    fn count(&self, max: Option<usize>) -> StrategyCounter {
-        if let Some(number) = max {
-            //do not count if that does not make sense
-            // best case scenario would be to get one right in the next step
-            // and all others in the step after
-            if number < 2 * self.number_of_candidates - 1 {
-                //self.counter = StrategyCounter::Obsolete;
-                return StrategyCounter::Obsolete;
-            }
-        }
-        if self.num_results() == self.number_of_candidates {
-            // if there is just one candidate left in this group
-            // note: the ResultHandlerType ensures, that the last candidate is also taken
-            if self.number_of_candidates == 1 {
-                return StrategyCounter::Done { count: 1 };
-            }
+// impl StrategyCounterTrait for CandidateResultType {
+//     ///execute the counting logic
+//     fn count(&self, max: Option<usize>) -> StrategyCounter {
+//         if let Some(number) = max {
+//             //do not count if that does not make sense
+//             // best case scenario would be to get one right in the next step
+//             // and all others in the step after
+//             if number < 2 * self.number_of_candidates - 1 {
+//                 //self.counter = StrategyCounter::Obsolete;
+//                 return StrategyCounter::Obsolete;
+//             }
+//         }
+//         if self.num_results() == self.number_of_candidates {
+//             // if there is just one candidate left in this group
+//             // note: the ResultHandlerType ensures, that the last candidate is also taken
+//             if self.number_of_candidates == 1 {
+//                 return StrategyCounter::Done { count: 1 };
+//             }
 
-            let value: u16 = self.number_of_candidates as u16;
+//             let value: u16 = self.number_of_candidates as u16;
 
-            // check if the solution was found and return the number of steps
-            return match self.contains(&ResultType::new(self.candidate.len() as u8, 0)) {
-                true => StrategyCounter::PartiallyFinished {
-                    count: 2 * value - 1, // exact number is clear
-                },
-                _ => StrategyCounter::PartiallyFinished {
-                    count: 2 * value, // worst case scenario, since the solution is not part of this step
-                },
-            };
-        }
-        // the best case how this could be solved
-        return StrategyCounter::Unfinished {
-            count: 2 * self.number_of_candidates as u16 - 1,
-        };
-    }
-}
+//             // check if the solution was found and return the number of steps
+//             return match self.contains(&ResultType::new(self.candidate.len() as u8, 0)) {
+//                 true => StrategyCounter::PartiallyFinished {
+//                     count: 2 * value - 1, // exact number is clear
+//                 },
+//                 _ => StrategyCounter::PartiallyFinished {
+//                     count: 2 * value, // worst case scenario, since the solution is not part of this step
+//                 },
+//             };
+//         }
+//         // the best case how this could be solved
+//         // --> this does not work.d
+//         return StrategyCounter::Unfinished {
+//             count: 2 * self.number_of_candidates as u16 - 1,
+//         };
+//     }
+// }
 #[test]
 fn test_result_handler() {
     let guesses = vec![
@@ -213,10 +238,10 @@ fn test_result_handler() {
     assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
     assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
 
-    assert!(matches!(
-        result_handler.count(None),
-        StrategyCounter::Unfinished { count: 9 }
-    ));
+    // assert!(matches!(
+    //     result_handler.count(None),
+    //     StrategyCounter::Unfinished { count: 9 }
+    // ));
 
     // example that should not be equal to above
     let guesses_neq = vec![
@@ -244,26 +269,26 @@ fn test_result_handler() {
     let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
     let result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
 
-    assert_eq!(
-        result_handler_cnt1.count(None),
-        StrategyCounter::Done { count: 1 }
-    );
+    // assert_eq!(
+    //     result_handler_cnt1.count(None),
+    //     StrategyCounter::Done { count: 1 }
+    // );
 
-    //now testing also the count -> for two results
-    let guesses_cnt2 = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![1, 2, 3, 5]),
-    ];
-    let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
-    assert_eq!(
-        result_handler_cnt2.count(None),
-        StrategyCounter::PartiallyFinished { count: 3 }
-    );
-    // check if the Obsolete path works
-    assert_eq!(
-        result_handler_cnt2.count(Some(2)),
-        StrategyCounter::Obsolete // not better than the other one -> obsolete
-    );
+    // //now testing also the count -> for two results
+    // let guesses_cnt2 = vec![
+    //     CodeType::new(vec![1, 2, 3, 4]),
+    //     CodeType::new(vec![1, 2, 3, 5]),
+    // ];
+    // let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+    // assert_eq!(
+    //     result_handler_cnt2.count(None),
+    //     StrategyCounter::PartiallyFinished { count: 3 }
+    // );
+    // // check if the Obsolete path works
+    // assert_eq!(
+    //     result_handler_cnt2.count(Some(2)),
+    //     StrategyCounter::Obsolete // not better than the other one -> obsolete
+    // );
 }
 
 /// class to identify the next inputs to test
@@ -328,6 +353,31 @@ impl CandidateHandlerType {
         }
 
         return false;
+    }
+
+    /// initiate the counting logic that also updates the status
+    fn count_initiate(&mut self) {
+        self.count();
+    }
+
+    /// counting Logic:
+    /// 1) count the number of tries and update the Status (calling top-down and finishing bottom up)
+    /// 2) cut away the unneccesary branches (top-down)
+    pub fn count(&mut self) -> &StrategyCounter {
+        // update the counter of all children
+        if let Some(count) = self
+            .candidate_list
+            .iter_mut()
+            .filter_map(|x| x.count().get_count())
+            .min()
+        {
+            self.count_storer = StrategyCounter::PartiallyFinished { count };
+        } else {
+            self.count_storer = StrategyCounter::new(self.candidate_list.len());
+        }
+        return &self.count_storer;
+
+        // retrieve the status (done / unfinished / partially finished)
     }
 
     /// return the number of candidates found
