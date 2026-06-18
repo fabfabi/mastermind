@@ -27,7 +27,7 @@ where
     // run for the first time to find the best value
     for candidate in candidate_list.iter() {
         let new_val = match candidate.count(Some(best_count as usize)) {
-            StrategyCounter::Done { count: number } => number,
+            StrategyCounter::Finished { count: number } => number,
             StrategyCounter::PartiallyFinished { count: number } => number,
             StrategyCounter::Unfinished { count: _ } => continue, //unfinished ones do not count
             StrategyCounter::Obsolete => continue,
@@ -48,7 +48,7 @@ where
     candidate_list.retain_mut(|x| match x.count(Some(best_count as usize)) {
         StrategyCounter::Obsolete => false,
         // all others will be kept
-        StrategyCounter::Done { count: _ } => {
+        StrategyCounter::Finished { count: _ } => {
             one_done = true;
             true
         }
@@ -67,7 +67,10 @@ where
     if candidate_list.len() == 0 {
         return (candidate_list, StrategyCounter::Obsolete);
     } else if all_done {
-        return (candidate_list, StrategyCounter::Done { count: best_count });
+        return (
+            candidate_list,
+            StrategyCounter::Finished { count: best_count },
+        );
     } else if one_partially_finished | one_done {
         return (
             candidate_list,
@@ -97,7 +100,7 @@ fn test_count_and_clean() {
             let matcher = |x| match x {
                 0 => StrategyCounter::Obsolete,
                 1 => StrategyCounter::Unfinished { count: 1 },
-                2..=5 => StrategyCounter::Done { count: x },
+                2..=5 => StrategyCounter::Finished { count: x },
                 13 => StrategyCounter::Unfinished { count: 13 }, // to check if this will be removed as obsolete
                 _ => StrategyCounter::PartiallyFinished { count: x },
             };
@@ -116,7 +119,7 @@ fn test_count_and_clean() {
     let s = S { v: 1 };
     assert_eq!(s.count(None), StrategyCounter::Unfinished { count: 1 });
     let s = S { v: 2 };
-    assert_eq!(s.count(None), StrategyCounter::Done { count: 2 });
+    assert_eq!(s.count(None), StrategyCounter::Finished { count: 2 });
     let s = S { v: 5 };
     assert_eq!(s.count(Some(2)), StrategyCounter::Obsolete);
 
@@ -143,7 +146,7 @@ fn test_count_and_clean() {
     (v, c) = count_and_clean(v, None);
     // should keep just the best done one
     assert_eq!(v, vec![S { v: 3 }]);
-    assert_eq!(c, StrategyCounter::Done { count: 3 });
+    assert_eq!(c, StrategyCounter::Finished { count: 3 });
 
     // fourth test -> same as third with a maximum
     v = vec![S { v: 8 }, S { v: 3 }, S { v: 4 }];
@@ -157,7 +160,7 @@ fn test_count_and_clean() {
     (v, c) = count_and_clean(v, None);
     // should keep just the best done one
     assert_eq!(v, vec![S { v: 3 }]);
-    assert_eq!(c, StrategyCounter::Done { count: 3 });
+    assert_eq!(c, StrategyCounter::Finished { count: 3 });
 }
 
 /// enum to calculate the number of entries for a strategy
@@ -165,21 +168,53 @@ fn test_count_and_clean() {
 pub enum StrategyCounter {
     Unfinished { count: u16 },        // counting not yet done
     PartiallyFinished { count: u16 }, // first count available
-    Done { count: u16 },              // this strategy path finished already
-    Obsolete,                         // This path has more moves than a known path
+    Finished { count: u16 },          // this strategy path finished already
+                                      //Obsolete,                         // This path has more moves than a known path
                                       //End,                              // this is the last node of the strategy
 }
 impl StrategyCounter {
+    /// return the best case how this could be solved
+    ///
+    /// Assuming the first shot would create a group for each candidate (incl one that is finished)
+    /// and another shot for clearing all the unfinished ones
     pub fn new(n_candidates: usize) -> Self {
+        //
         return Self::Unfinished {
-            count: 2 * n_candidates as u16,
+            count: 2 * n_candidates as u16 - 1,
         };
     }
-    pub fn get_count(&self) -> Option<u16> {
+
+    /// returns the count only for those that are (partially )
+    pub fn get_done_count(&self) -> Option<u16> {
         return match self {
             Self::PartiallyFinished { count } => Some(*count),
-            Self::Done { count } => Some(*count),
+            Self::Finished { count } => Some(*count),
             _ => None,
+        };
+    }
+
+    /// returns the count estimate
+    pub fn get_count_estimate(&self) -> u16 {
+        return match *self {
+            Self::PartiallyFinished { count } => count,
+            Self::Finished { count } => count,
+            Self::Unfinished { count } => count,
+        };
+    }
+
+    /// if the counter is done
+    pub fn is_done(&self) -> bool {
+        return match self {
+            Self::Finished { count: _ } => true,
+            _ => false,
+        };
+    }
+    /// takes a reference and decides whether to keep the branch behind this counter
+    pub fn keep(&self, count_reference: u16) -> bool {
+        return match *self {
+            Self::PartiallyFinished { count } => count <= count_reference,
+            Self::Finished { count } => count <= count_reference,
+            _ => true,
         };
     }
 }

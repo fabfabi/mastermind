@@ -8,6 +8,14 @@ pub struct ConfigType {
     pub columns: usize,
     pub colors: u8,
 }
+impl ConfigType {
+    pub fn done(&self) -> ResultType {
+        ResultType {
+            positions: self.columns as u8,
+            colors: 0,
+        }
+    }
+}
 
 ///Structure to store the result
 #[derive(PartialEq, Debug, Copy, Clone, Hash, Eq)]

@@ -23,10 +23,12 @@ use std::collections::HashMap;
 /// see: https://users.rust-lang.org/t/how-to-implement-typestate-instead-of-enums-for/140769
 enum CandidateResultHashmap {
     NEW(HashMap<ResultType, Vec<CodeType>>),
-    DONE(HashMap<ResultType, CandidateHandlerType>),
+    PROPAGATED(HashMap<ResultType, CandidateHandlerType>),
 }
 impl CandidateResultHashmap {
     /// Create the next level of candidates.
+    ///
+    /// The propagation stops when a CandidateResultHandler is in status done.
     ///
     /// IMPORTANT: This function contains the entire logic and also needs to cover when to stop propagating.
     pub fn create_next_candidates<'a>(&mut self, configuration: &'a ConfigType) {
@@ -42,11 +44,13 @@ impl CandidateResultHashmap {
                     );
                 });
 
-                *self = Self::DONE(hashmap_new)
+                *self = Self::PROPAGATED(hashmap_new)
             }
-            Self::DONE(hashmap) => {
+            Self::PROPAGATED(hashmap) => {
                 hashmap
                     .values_mut()
+                    //not entirely sure if that filter is needed
+                    .filter(|x| !x.is_done())
                     .for_each(|x| x.propagate_next_level(configuration));
             }
         }
@@ -55,14 +59,14 @@ impl CandidateResultHashmap {
     pub fn contains(&self, other_result: &ResultType) -> bool {
         return match self {
             Self::NEW(hm) => hm.contains_key(other_result),
-            Self::DONE(hm) => hm.contains_key(other_result),
+            Self::PROPAGATED(hm) => hm.contains_key(other_result),
         };
     }
     /// return the number of results
     pub fn num_results(&self) -> usize {
         return match self {
             Self::NEW(hm) => hm.keys().len(),
-            Self::DONE(hm) => hm.keys().len(),
+            Self::PROPAGATED(hm) => hm.keys().len(),
         };
     }
 
@@ -93,17 +97,58 @@ impl CandidateResultHashmap {
     }
     pub fn count(&mut self) -> StrategyCounter {
         return match self {
-            Self::NEW(hm) => {}
-            Self::DONE(hm) => {}
+            // new means the children are not yet counted
+            Self::NEW(hm) => StrategyCounter::new(hm.keys().len()),
+            // this is the actual counting logic
+            // -> find the best count from all children
+            // return DONE if all are DONE otherwise
+            Self::PROPAGATED(hm) => {
+                let number_of_candidates =
+                    hm.values().map(|x| x.number_of_candidates as usize).sum();
+
+                if hm.keys().len() == number_of_candidates {
+                    // if there is just one candidate left in this group
+                    // note: the ResultHandlerType ensures, that the last candidate is also taken
+                    if number_of_candidates == 1 {
+                        return StrategyCounter::Finished { count: 1 };
+                    }
+
+                    return StrategyCounter::PartiallyFinished {
+                        count: 2 * number_of_candidates as u16, // exact number is clear
+                    };
+
+                    // the configuration is not available here and the difference is only one...
+                    // let value: u16 = number_of_candidates as u16;
+                    // // check if the solution was found and return the number of steps
+                    // return match self.contains(&ResultType::is_done(&self, configuration)) {
+                    //     true => StrategyCounter::PartiallyFinished {
+                    //         count: 2 * value - 1, // exact number is clear
+                    //     },
+                    //     _ => StrategyCounter::PartiallyFinished {
+                    //         count: 2 * value, // worst case scenario, since the solution is not part of this step
+                    //     },
+                    // };
+                }
+                // otherwise return the sum of all counts for all children
+                return StrategyCounter::Unfinished {
+                    count: hm
+                        .values()
+                        .map(|x| x.count_storer.get_count_estimate())
+                        .sum(),
+                };
+            }
         };
     }
 }
 
 /// class to handle the results of one candidate
+///
+/// the main parts of the logic is contained within CandidateResultHashmap
+/// This class only forwards the calls.
 // #[derive(Clone)]
 struct CandidateResultType {
     result_hashmap: CandidateResultHashmap,
-    pub candidate: CodeType,
+    candidate: CodeType,
     pub counter: StrategyCounter,
     number_of_candidates: usize,
 }
@@ -130,6 +175,9 @@ impl CandidateResultType {
     }
 
     /// propagate to the next level
+    ///
+    /// On purpose this does not contain any logic in order to concentrate
+    /// the logic within CandidateResultHashmap::create_next_candidates
     fn propagate_next_level(&mut self, configuration: &ConfigType) {
         self.result_hashmap.create_next_candidates(&configuration);
     }
@@ -148,6 +196,7 @@ impl CandidateResultType {
     fn num_entries(&self, result: &ResultType) -> usize {
         self.result_hashmap.num_entries(result)
     }
+
     /// executing the count and update the counter
     pub fn count(&mut self) -> &StrategyCounter {
         self.counter = self.result_hashmap.count();
@@ -195,7 +244,7 @@ impl CandidateResultType {
 //             // if there is just one candidate left in this group
 //             // note: the ResultHandlerType ensures, that the last candidate is also taken
 //             if self.number_of_candidates == 1 {
-//                 return StrategyCounter::Done { count: 1 };
+//                 return StrategyCounter::Finished { count: 1 };
 //             }
 
 //             let value: u16 = self.number_of_candidates as u16;
@@ -211,7 +260,6 @@ impl CandidateResultType {
 //             };
 //         }
 //         // the best case how this could be solved
-//         // --> this does not work.d
 //         return StrategyCounter::Unfinished {
 //             count: 2 * self.number_of_candidates as u16 - 1,
 //         };
@@ -296,6 +344,7 @@ fn test_result_handler() {
 pub struct CandidateHandlerType {
     candidate_list: Vec<CandidateResultType>,
     count_storer: StrategyCounter,
+    number_of_candidates: u16, // needed for the counting logic
 }
 impl CandidateHandlerType {
     ///creates the next level of candidates. This function triggers the heavy lifting
@@ -303,6 +352,7 @@ impl CandidateHandlerType {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
             count_storer: StrategyCounter::new(candidates.len()),
+            number_of_candidates: candidates.len() as u16,
         };
         // if there are only a few candidates left, no more grading needed
         // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
@@ -360,19 +410,24 @@ impl CandidateHandlerType {
         self.count();
     }
 
-    /// counting Logic:
+    /// global counting Logic:
     /// 1) count the number of tries and update the Status (calling top-down and finishing bottom up)
     /// 2) cut away the unneccesary branches (top-down)
+    ///
+    /// For the CandidateHandlerType: cut away the branches that are worse than already finished branches
     pub fn count(&mut self) -> &StrategyCounter {
-        // update the counter of all children
-        if let Some(count) = self
+        // update the counter of all children and retrieve the best count
+        if let Some(count_best_done) = self
             .candidate_list
             .iter_mut()
-            .filter_map(|x| x.count().get_count())
+            .filter_map(|x| x.count().get_done_count())
             .min()
         {
-            self.count_storer = StrategyCounter::PartiallyFinished { count };
+            // chop-off all candidates that exceed the best count
+            self.candidate_list
+                .retain(|x| x.counter.keep(count_best_done))
         } else {
+            // otherwise assume the best way to close the
             self.count_storer = StrategyCounter::new(self.candidate_list.len());
         }
         return &self.count_storer;
@@ -428,35 +483,35 @@ impl CandidateHandlerType {
     //     }
     // }
 }
-impl StrategyCounterTrait for CandidateHandlerType {
-    fn count(&self, max: Option<usize>) -> StrategyCounter {
-        // unpack the maximum
-        if let Some(given_max_number) = max {
-            //matcher to overrule to obsolete if a better strategy has been found
-            let count_overruler = |t: StrategyCounter, num: u16| {
-                if num as usize >= given_max_number {
-                    return StrategyCounter::Obsolete;
-                }
-                return t;
-            };
-            // and match to the current count
-            match self.count_storer {
-                StrategyCounter::Done { count: number } => {
-                    return count_overruler(self.count_storer, number)
-                }
-                StrategyCounter::PartiallyFinished { count: number } => {
-                    return count_overruler(self.count_storer, number)
-                }
-                StrategyCounter::Unfinished { count: number } => {
-                    return count_overruler(self.count_storer, number)
-                }
-                _ => return self.count_storer,
-            }
-        }
-        // otherwise just return the count_storer
-        return self.count_storer;
-    }
-}
+// impl StrategyCounterTrait for CandidateHandlerType {
+//     fn count(&self, max: Option<usize>) -> StrategyCounter {
+//         // unpack the maximum
+//         if let Some(given_max_number) = max {
+//             //matcher to overrule to obsolete if a better strategy has been found
+//             let count_overruler = |t: StrategyCounter, num: u16| {
+//                 if num as usize >= given_max_number {
+//                     return StrategyCounter::Obsolete;
+//                 }
+//                 return t;
+//             };
+//             // and match to the current count
+//             match self.count_storer {
+//                 StrategyCounter::Finished { count: number } => {
+//                     return count_overruler(self.count_storer, number)
+//                 }
+//                 StrategyCounter::PartiallyFinished { count: number } => {
+//                     return count_overruler(self.count_storer, number)
+//                 }
+//                 StrategyCounter::Unfinished { count: number } => {
+//                     return count_overruler(self.count_storer, number)
+//                 }
+//                 _ => return self.count_storer,
+//             }
+//         }
+//         // otherwise just return the count_storer
+//         return self.count_storer;
+//     }
+// }
 /* //core::iter::traits::iterator;
 impl Iterator for CandidateHandlerType {
     type Item = CandidateResultType;
