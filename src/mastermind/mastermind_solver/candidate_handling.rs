@@ -312,6 +312,30 @@ fn test_result_handler_basics() {
 }
 
 #[test]
+fn test_candidate_handler_propagation2() {
+    let configuration = &ConfigType {
+        columns: 3,
+        colors: 4,
+    };
+    // trivial case.
+    // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
+    let guesses = vec![
+        CodeType::new(vec![0, 0, 1]),
+        CodeType::new(vec![0, 1, 2]),
+        CodeType::new(vec![3, 0, 0]),
+    ];
+    let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
+    result_handler.count();
+
+    result_handler.propagate_next_level(configuration);
+    result_handler.count();
+
+    assert_eq!(
+        result_handler.counter_stored,
+        StrategyCounter::FINISHED { count: 6 }
+    );
+}
+#[test]
 fn test_candidate_handler_propagation() {
     let configuration = &ConfigType {
         columns: 3,
@@ -330,18 +354,18 @@ fn test_candidate_handler_propagation() {
     );
     // update the counter
     result_handler.count();
-    result_handler.show_details();
+    // result_handler.show_details();
 
     assert_eq!(
         result_handler.counter_stored,
-        StrategyCounter::PENDING { count: 7 }
+        StrategyCounter::PARTIALLY_FINISHED { count: 7 }
     );
     result_handler.propagate_next_level(configuration);
-    result_handler.show_details();
+    // result_handler.show_details();
     let a = 2;
     assert_eq!(
         *result_handler.count(),
-        StrategyCounter::FINISHED { count: 5 }
+        StrategyCounter::PARTIALLY_FINISHED { count: 9 }
     );
 }
 
@@ -350,7 +374,7 @@ fn test_candidate_handler_propagation() {
 struct CandidateHandlerType {
     candidate_list: Vec<CandidateResultType>,
     counter_stored: StrategyCounter,
-    number_of_candidates: u16, // needed for the counting logic
+    number_of_candidates: u16, // TBD: needed for the counting logic?
 }
 impl CandidateHandlerType {
     /// create a candidate handler for a completely new game
@@ -434,7 +458,7 @@ impl CandidateHandlerType {
             .candidate_list
             .iter_mut()
             // -> this triggers the update of the children
-            .filter_map(|x| x.count().get_done_count())
+            .filter_map(|x| x.count().get_count_finished())
             .min()
         {
             // chop-off all candidates that exceed the best count
@@ -445,7 +469,7 @@ impl CandidateHandlerType {
             if self
                 .candidate_list
                 .iter()
-                .all(|x| x.counter_stored.is_done())
+                .all(|x| x.counter_stored.is_finished())
             {
                 self.counter_stored = StrategyCounter::FINISHED {
                     count: count_best_done,

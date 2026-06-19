@@ -23,7 +23,7 @@ impl StrategyCounter {
     }
 
     /// returns the count only for those that are (partially )
-    pub fn get_done_count(&self) -> Option<u16> {
+    pub fn get_count_finished(&self) -> Option<u16> {
         return match self {
             Self::PARTIALLY_FINISHED { count } => Some(*count),
             Self::FINISHED { count } => Some(*count),
@@ -41,7 +41,7 @@ impl StrategyCounter {
     }
 
     /// if the counter is done
-    pub fn is_done(&self) -> bool {
+    pub fn is_finished(&self) -> bool {
         return match self {
             Self::FINISHED { count: _ } => true,
             _ => false,
