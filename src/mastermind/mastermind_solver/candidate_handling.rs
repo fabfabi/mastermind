@@ -94,7 +94,7 @@ impl CandidateResultHashmap {
         return true;
     }
     pub fn count(&mut self, number_of_candidates: usize) -> StrategyCounter {
-        /// closure to check the finished path
+        // closure to check the finished path
         let check_finished = |hm_keys_length: usize, other_option: StrategyCounter| {
             if hm_keys_length == number_of_candidates {
                 // if there is just one candidate left in this group
@@ -125,18 +125,25 @@ impl CandidateResultHashmap {
         return match self {
             // new means the children are not yet counted
             Self::NEW(hm) => check_finished(hm.keys().len(), StrategyCounter::new(hm.keys().len())),
-            // this is the actual counting logic
-            // -> find the best count from all children
-            // return DONE if all are DONE otherwise
             Self::PROPAGATED(hm) => {
+                // this is the actual counting logic
+                // -> find the best count from all children
+                // return DONE if all are DONE otherwise unfinished
+                // this is detected by the closure for the return type
+                let get_return_type = |count_total| {
+                    if hm.values().all(|x| x.is_done()) {
+                        return StrategyCounter::Finished { count: count_total };
+                    }
+                    StrategyCounter::Unfinished { count: count_total }
+                };
                 return check_finished(
                     hm.keys().len(),
-                    StrategyCounter::Unfinished {
-                        count: hm
-                            .values()
+                    get_return_type(
+                        // the total count is the sum of all other counts
+                        hm.values()
                             .map(|x| x.count_storer.get_count_estimate())
                             .sum(),
-                    },
+                    ),
                 );
             }
         };
@@ -223,6 +230,10 @@ impl CandidateResultType {
 
 #[test]
 fn test_result_handler() {
+    let configuration = &ConfigType {
+        columns: 4,
+        colors: 5,
+    };
     let guesses = vec![
         CodeType::new(vec![1, 2, 3, 4]),
         CodeType::new(vec![1, 1, 1, 1]),
@@ -290,6 +301,13 @@ fn test_result_handler() {
     assert_eq!(
         *result_handler_cnt2.count(),
         StrategyCounter::PartiallyFinished { count: 4 }
+    );
+
+    result_handler_cnt2.propagate_next_level(configuration);
+
+    assert_eq!(
+        *result_handler_cnt2.count(),
+        StrategyCounter::Finished { count: 3 }
     );
     // // check if the Obsolete path works --> Obsolete is removed
     // assert_eq!(
@@ -359,12 +377,6 @@ impl CandidateHandlerType {
     }
     /// check if a similar CandidateResult is already found
     fn contains_similar(&self, other_candidate_result: &CandidateResultType) -> bool {
-        /* // if this input was already given, then all codes will have the same result
-        if other_candidate_result.result_hashmap.len() == 1 {
-            let candidate = other_candidate_result.candidate;
-
-            return !() // check if there are more entries contained in this list
-        } */
         for code in self.candidate_list.iter() {
             if code.eq(&other_candidate_result) {
                 return true;
