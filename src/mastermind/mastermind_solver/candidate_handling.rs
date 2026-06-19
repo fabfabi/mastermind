@@ -93,6 +93,55 @@ impl CandidateResultHashmap {
         }
         return true;
     }
+    // Might be a bit of an overkill to define a generic function to execute closures on a Hashmap
+    // fn exec_closure<T>(self, closure: Box<dyn Fn(HashMap<ResultType, T>) >){
+    //     match self {
+    //         Self::NEW(hm) => closure(hm),
+    //         Self::PROPAGATED(hm) => closure(hm),
+    //     }
+    // }
+
+    /// show the output
+    pub fn show_details(&self, indentation: usize) {
+        match self {
+            Self::NEW(hm) => {
+                println!(
+                    "{}{} CandidateResultHashmap::NEW",
+                    " ".repeat(indentation),
+                    indentation
+                );
+                for (k, v) in hm.iter() {
+                    println!(
+                        "{}{} {}{}",
+                        " ".repeat(indentation),
+                        indentation,
+                        k,
+                        v.len()
+                    );
+                }
+            }
+            Self::PROPAGATED(hm) => {
+                println!(
+                    "{}{} CandidateResultHashmap::PROPAGATED",
+                    " ".repeat(indentation),
+                    indentation
+                );
+                for (k, v) in hm.iter() {
+                    println!("{}{} {}", " ".repeat(indentation), indentation, k,);
+                    v.show_details(indentation + 1);
+                }
+            }
+        }
+    }
+
+    // pub fn show_details(&self, indentation: usize) {}
+
+    /// function to count the number of tries of one candidates.
+    ///
+    /// The difference to the count function of the CandidateHandlerType:
+    /// * Adds `number_of_candidates` to the total count. (one try for each candidate)
+    /// * PARTIALLY_FINISHED if all children can be FINISHED in the next loop.
+    /// * FINISHED if all children are FINISHED.
     pub fn count(&mut self, number_of_candidates: usize) -> StrategyCounter {
         // closure to check the finished path
         let check_finished = |hm_keys_length: usize, other_option: StrategyCounter| {
@@ -104,7 +153,7 @@ impl CandidateResultHashmap {
                 }
 
                 return StrategyCounter::PARTIALLY_FINISHED {
-                    count: 2 * number_of_candidates as u16, // exact number is clear
+                    count: 2 * number_of_candidates as u16 - 1, // exact number is clear
                 };
 
                 // the configuration is not available here and the difference is only one...
@@ -129,7 +178,13 @@ impl CandidateResultHashmap {
             }
             Self::PROPAGATED(hm) => {
                 // this is the actual counting logic
-                // -> find the best count from all children
+                // -> sum the count of all children
+                let count_children = hm
+                    .values_mut()
+                    // this triggers the update of all children
+                    .map(|x| x.count().get_count_estimate())
+                    .sum::<u16>();
+
                 // return DONE if all are DONE otherwise unfinished
                 // this is detected by the closure for the return type
                 let get_return_type = |count_total: u16| {
@@ -143,9 +198,7 @@ impl CandidateResultHashmap {
                     hm.keys().len(),
                     get_return_type(
                         // the total count is the sum of all other counts
-                        hm.values()
-                            .map(|x| x.counter_stored.get_count_estimate())
-                            .sum::<u16>()
+                        count_children
                             // sum all future counts + the current count (i.e. one input per candidate)
                             + number_of_candidates as u16,
                     ),
@@ -158,7 +211,7 @@ impl CandidateResultHashmap {
 /// class to handle the results of one candidate
 ///
 /// the main parts of the logic is contained within CandidateResultHashmap
-/// This class only forwards the calls.
+/// This struct bridges to CandidateResultHashmap which acts as a state machine
 // #[derive(Clone)]
 struct CandidateResultType {
     result_hashmap: CandidateResultHashmap,
@@ -219,12 +272,19 @@ impl CandidateResultType {
     }
 
     /// show a high-level summary
-    fn show(&self) {
+    fn show(&self, indentation: usize) {
         println!(
-            "Candidate: '{}' with {} groups",
+            "{}{} Candidate: '{}' with {} groups",
+            " ".repeat(indentation),
+            indentation,
             self.candidate,
             self.result_hashmap.number_of_next_candidates()
         );
+    }
+
+    fn show_details(&self, indentation: usize) {
+        self.show(indentation);
+        self.result_hashmap.show_details(indentation);
     }
 
     ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
@@ -326,13 +386,23 @@ fn test_candidate_handler_propagation2() {
     ];
     let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
     result_handler.count();
+    result_handler.show_details(0);
 
     result_handler.propagate_next_level(configuration);
     result_handler.count();
+    result_handler.show_details(0);
 
     assert_eq!(
         result_handler.counter_stored,
-        StrategyCounter::FINISHED { count: 6 }
+        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
+    );
+
+    result_handler.propagate_next_level(configuration);
+    result_handler.count();
+    result_handler.show_details(0);
+    assert_eq!(
+        result_handler.counter_stored,
+        StrategyCounter::FINISHED { count: 5 }
     );
 }
 #[test]
@@ -365,7 +435,14 @@ fn test_candidate_handler_propagation() {
     let a = 2;
     assert_eq!(
         *result_handler.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 9 }
+        StrategyCounter::PARTIALLY_FINISHED { count: 6 }
+    );
+    result_handler.propagate_next_level(configuration);
+    // result_handler.show_details();
+    let a = 2;
+    assert_eq!(
+        *result_handler.count(),
+        StrategyCounter::FINISHED { count: 6 }
     );
 }
 
@@ -450,11 +527,14 @@ impl CandidateHandlerType {
     ///
     /// For the CandidateHandlerType: cut away the branches that are worse than already finished branches
     ///
-    /// Note: The CandidateHandlerType does not add to the count, it just selects the best candidate.
+    /// The difference to the count function of the CandidateResultHashmap:
+    /// * does not add to the total count
+    /// * PARTIALLY_FINISHED if one child is FINISHED
+    /// * FINISHED if all children are FINISHED (or removed)
     fn count(&mut self) -> &StrategyCounter {
         // update the counter of all children and retrieve the best count
         // first check: find finished paths
-        if let Some(count_best_done) = self
+        if let Some(count_best_finished) = self
             .candidate_list
             .iter_mut()
             // -> this triggers the update of the children
@@ -463,7 +543,7 @@ impl CandidateHandlerType {
         {
             // chop-off all candidates that exceed the best count
             self.candidate_list
-                .retain(|x| x.counter_stored.keep(count_best_done));
+                .retain(|x| x.counter_stored.keep(count_best_finished));
 
             // and set the count storer
             if self
@@ -472,21 +552,21 @@ impl CandidateHandlerType {
                 .all(|x| x.counter_stored.is_finished())
             {
                 self.counter_stored = StrategyCounter::FINISHED {
-                    count: count_best_done,
+                    count: count_best_finished,
                 };
             } else {
                 self.counter_stored = StrategyCounter::PARTIALLY_FINISHED {
-                    count: count_best_done,
+                    count: count_best_finished,
                 };
             }
         // no finished paths -> find pending ones
-        } else if let Some(best_count) = self
+        } else if let Some(count_best) = self
             .candidate_list
             .iter()
             .map(|x| x.counter_stored.get_count_estimate())
             .min()
         {
-            self.counter_stored = StrategyCounter::PARTIALLY_FINISHED { count: best_count };
+            self.counter_stored = StrategyCounter::PARTIALLY_FINISHED { count: count_best };
         }
         return &self.counter_stored;
     }
@@ -506,16 +586,18 @@ impl CandidateHandlerType {
         return self.candidate_list.len() == 1;
     }
 
-    fn show(&self) {
+    fn show(&self, indentation: usize) {
         println!(
-            "CandidateHandler with {} candidates",
+            "{}{} CandidateHandler with {} candidates",
+            " ".repeat(indentation),
+            indentation,
             self.candidate_list.len()
         );
     }
-    fn show_details(&self) {
-        self.show();
+    fn show_details(&self, indentation: usize) {
+        self.show(indentation);
         for candidate in &self.candidate_list {
-            candidate.show();
+            candidate.show_details(indentation + 1);
         }
     }
 }
@@ -548,7 +630,7 @@ fn test_candidatehandlertype_basic() {
     // or different color (20 10x2 02)
     assert_eq!(cht.len(), 2);
     cht.count();
-    cht.show_details();
+    cht.show_details(0);
     assert_eq!(
         cht.counter_stored,
         StrategyCounter::PARTIALLY_FINISHED { count: 7 }
