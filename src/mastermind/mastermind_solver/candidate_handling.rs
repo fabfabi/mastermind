@@ -6,7 +6,7 @@ use crate::mastermind::mastermind_mechanics::grade;
 use crate::mastermind::mastermind_mechanics::CodeType;
 use crate::mastermind::mastermind_mechanics::ConfigType;
 use crate::mastermind::mastermind_mechanics::ResultType;
-use crate::mastermind::mastermind_solver::strategy_counter::count_and_clean;
+// use crate::mastermind::mastermind_solver::strategy_counter::count_and_clean;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounterTrait;
 use std::collections::HashMap;
@@ -63,7 +63,7 @@ impl CandidateResultHashmap {
         };
     }
     /// return the number of results
-    pub fn num_results(&self) -> usize {
+    pub fn number_of_next_candidates(&self) -> usize {
         return match self {
             Self::NEW(hm) => hm.keys().len(),
             Self::PROPAGATED(hm) => hm.keys().len(),
@@ -71,7 +71,7 @@ impl CandidateResultHashmap {
     }
 
     /// number of the candidates for one specific result
-    pub fn num_entries(&self, result: &ResultType) -> usize {
+    pub fn number_of_candidates_per_result(&self, result: &ResultType) -> usize {
         if let Self::NEW(hm) = self {
             if let Some(entries) = hm.get(result) {
                 return entries.len();
@@ -84,58 +84,90 @@ impl CandidateResultHashmap {
     /// These are defined same if there are same numbers of candidates behind the same results
     pub fn eq(&self, other: &Self) -> bool {
         if let Self::NEW(hm) = self {
-            if !other.num_results() == self.num_results() {
+            if !other.number_of_next_candidates() == self.number_of_next_candidates() {
                 return false;
             }
             for (result, entries) in hm {
-                if entries.len() != other.num_entries(&result) {
+                if entries.len() != other.number_of_candidates_per_result(&result) {
                     return false;
                 }
             }
         }
         return true;
     }
-    pub fn count(&mut self) -> StrategyCounter {
+    pub fn count(&mut self, number_of_candidates: usize) -> StrategyCounter {
+        /// closure to check the finished path
+        let check_finished = |hm_keys_length: usize, other_option: StrategyCounter| {
+            if hm_keys_length == number_of_candidates {
+                // if there is just one candidate left in this group
+                // note: the ResultHandlerType ensures, that the last candidate is also taken
+                if number_of_candidates == 1 {
+                    return StrategyCounter::Finished { count: 1 };
+                }
+
+                return StrategyCounter::PartiallyFinished {
+                    count: 2 * number_of_candidates as u16, // exact number is clear
+                };
+
+                // the configuration is not available here and the difference is only one...
+                // let value: u16 = number_of_candidates as u16;
+                // // check if the solution was found and return the number of steps
+                // return match self.contains(&ResultType::is_done(&self, configuration)) {
+                //     true => StrategyCounter::PartiallyFinished {
+                //         count: 2 * value - 1, // exact number is clear
+                //     },
+                //     _ => StrategyCounter::PartiallyFinished {
+                //         count: 2 * value, // worst case scenario, since the solution is not part of this step
+                //     },
+                // };
+            }
+            return other_option;
+        };
+
         return match self {
             // new means the children are not yet counted
-            Self::NEW(hm) => StrategyCounter::new(hm.keys().len()),
+            Self::NEW(hm) => check_finished(hm.keys().len(), StrategyCounter::new(hm.keys().len())),
             // this is the actual counting logic
             // -> find the best count from all children
             // return DONE if all are DONE otherwise
             Self::PROPAGATED(hm) => {
-                let number_of_candidates =
-                    hm.values().map(|x| x.number_of_candidates as usize).sum();
+                // take the number_of_candidates from the CandidateHandlerType
+                // let number_of_candidates =
+                //     hm.values().map(|x| x.number_of_candidates as usize).sum();
 
-                if hm.keys().len() == number_of_candidates {
-                    // if there is just one candidate left in this group
-                    // note: the ResultHandlerType ensures, that the last candidate is also taken
-                    if number_of_candidates == 1 {
-                        return StrategyCounter::Finished { count: 1 };
-                    }
+                // if hm.keys().len() == number_of_candidates {
+                //     // if there is just one candidate left in this group
+                //     // note: the ResultHandlerType ensures, that the last candidate is also taken
+                //     if number_of_candidates == 1 {
+                //         return StrategyCounter::Finished { count: 1 };
+                //     }
 
-                    return StrategyCounter::PartiallyFinished {
-                        count: 2 * number_of_candidates as u16, // exact number is clear
-                    };
+                //     return StrategyCounter::PartiallyFinished {
+                //         count: 2 * number_of_candidates as u16, // exact number is clear
+                //     };
 
-                    // the configuration is not available here and the difference is only one...
-                    // let value: u16 = number_of_candidates as u16;
-                    // // check if the solution was found and return the number of steps
-                    // return match self.contains(&ResultType::is_done(&self, configuration)) {
-                    //     true => StrategyCounter::PartiallyFinished {
-                    //         count: 2 * value - 1, // exact number is clear
-                    //     },
-                    //     _ => StrategyCounter::PartiallyFinished {
-                    //         count: 2 * value, // worst case scenario, since the solution is not part of this step
-                    //     },
-                    // };
-                }
+                //     // the configuration is not available here and the difference is only one...
+                //     // let value: u16 = number_of_candidates as u16;
+                //     // // check if the solution was found and return the number of steps
+                //     // return match self.contains(&ResultType::is_done(&self, configuration)) {
+                //     //     true => StrategyCounter::PartiallyFinished {
+                //     //         count: 2 * value - 1, // exact number is clear
+                //     //     },
+                //     //     _ => StrategyCounter::PartiallyFinished {
+                //     //         count: 2 * value, // worst case scenario, since the solution is not part of this step
+                //     //     },
+                //     // };
+                // }
                 // otherwise return the sum of all counts for all children
-                return StrategyCounter::Unfinished {
-                    count: hm
-                        .values()
-                        .map(|x| x.count_storer.get_count_estimate())
-                        .sum(),
-                };
+                return check_finished(
+                    hm.keys().len(),
+                    StrategyCounter::Unfinished {
+                        count: hm
+                            .values()
+                            .map(|x| x.count_storer.get_count_estimate())
+                            .sum(),
+                    },
+                );
             }
         };
     }
@@ -149,7 +181,7 @@ impl CandidateResultHashmap {
 struct CandidateResultType {
     result_hashmap: CandidateResultHashmap,
     candidate: CodeType,
-    pub counter: StrategyCounter,
+    counter: StrategyCounter,
     number_of_candidates: usize,
 }
 impl CandidateResultType {
@@ -162,7 +194,7 @@ impl CandidateResultType {
             let result = grade(&guess, &solution);
             map.entry(result)
                 .or_insert_with(|| Vec::<CodeType>::new())
-                .push(guess.clone()); //how would this work without the "clone" --> NO?
+                .push(guess.clone()); // would this work without the "clone" --> NO?
         }
 
         let n_candidates = guesses.len();
@@ -189,29 +221,29 @@ impl CandidateResultType {
 
     ///returns the overall number of different results
     fn num_results(&self) -> usize {
-        return self.result_hashmap.num_results();
+        return self.result_hashmap.number_of_next_candidates();
     }
 
     ///returns the number of entries for a given result
     fn num_entries(&self, result: &ResultType) -> usize {
-        self.result_hashmap.num_entries(result)
+        self.result_hashmap.number_of_candidates_per_result(result)
     }
 
     /// executing the count and update the counter
     pub fn count(&mut self) -> &StrategyCounter {
-        self.counter = self.result_hashmap.count();
+        self.counter = self.result_hashmap.count(self.number_of_candidates);
 
         return &self.counter;
     }
 
-    // /// show a high-level summary
-    // fn show(&self) {
-    //     println!(
-    //         "Candidate: '{}' with {} groups",
-    //         self.candidate,
-    //         self.result_hashmap.len()
-    //     );
-    // }
+    /// show a high-level summary
+    fn show(&self) {
+        println!(
+            "Candidate: '{}' with {} groups",
+            self.candidate,
+            self.result_hashmap.number_of_next_candidates()
+        );
+    }
 
     ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
     fn eq(&self, other: &Self) -> bool {
@@ -315,40 +347,48 @@ fn test_result_handler() {
 
     //now testing also the count -> for only one result
     let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
-    let result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
+    let mut result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
 
-    // assert_eq!(
-    //     result_handler_cnt1.count(None),
-    //     StrategyCounter::Done { count: 1 }
-    // );
+    assert_eq!(
+        *result_handler_cnt1.count(),
+        StrategyCounter::Finished { count: 1 }
+    );
 
-    // //now testing also the count -> for two results
-    // let guesses_cnt2 = vec![
-    //     CodeType::new(vec![1, 2, 3, 4]),
-    //     CodeType::new(vec![1, 2, 3, 5]),
-    // ];
-    // let result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+    //now testing also the count -> for two results
+    let guesses_cnt2 = vec![
+        CodeType::new(vec![1, 2, 3, 4]),
+        CodeType::new(vec![1, 2, 3, 5]),
+    ];
+    let mut result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+
+    // note: this should become 3 but I did not want to implement into CandidateResultHashmap.count to check
+    // whether the finished solution is contained. If this changes -> 3
+    assert_eq!(
+        *result_handler_cnt2.count(),
+        StrategyCounter::PartiallyFinished { count: 4 }
+    );
+    // // check if the Obsolete path works --> Obsolete is removed
     // assert_eq!(
-    //     result_handler_cnt2.count(None),
-    //     StrategyCounter::PartiallyFinished { count: 3 }
-    // );
-    // // check if the Obsolete path works
-    // assert_eq!(
-    //     result_handler_cnt2.count(Some(2)),
+    //     result_handler_cnt2.count(),
     //     StrategyCounter::Obsolete // not better than the other one -> obsolete
     // );
 }
 
 /// class to identify the next inputs to test
 /// After entering a list of candidates (that are open), this class finds all possible next inputs
-pub struct CandidateHandlerType {
+struct CandidateHandlerType {
     candidate_list: Vec<CandidateResultType>,
     count_storer: StrategyCounter,
     number_of_candidates: u16, // needed for the counting logic
 }
 impl CandidateHandlerType {
+    /// create a candidate handler for a completely new game
+    fn new(configuration: &ConfigType) -> Self {
+        let candidates = get_all_codes(configuration);
+        return CandidateHandlerType::create_next_candidates(candidates, configuration);
+    }
     ///creates the next level of candidates. This function triggers the heavy lifting
-    pub fn create_next_candidates(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
+    fn create_next_candidates(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
             count_storer: StrategyCounter::new(candidates.len()),
@@ -383,7 +423,12 @@ impl CandidateHandlerType {
         return result;
     }
 
-    pub fn propagate_next_level(&mut self, configuration: &ConfigType) {
+    /// return the number of candidates identified for the next input
+    fn number_of_candidates_next_input(&self) -> usize {
+        self.candidate_list.len()
+    }
+
+    fn propagate_next_level(&mut self, configuration: &ConfigType) {
         self.candidate_list
             .iter_mut()
             .for_each(|x| x.propagate_next_level(&configuration))
@@ -415,7 +460,7 @@ impl CandidateHandlerType {
     /// 2) cut away the unneccesary branches (top-down)
     ///
     /// For the CandidateHandlerType: cut away the branches that are worse than already finished branches
-    pub fn count(&mut self) -> &StrategyCounter {
+    fn count(&mut self) -> &StrategyCounter {
         // update the counter of all children and retrieve the best count
         if let Some(count_best_done) = self
             .candidate_list
@@ -470,18 +515,18 @@ impl CandidateHandlerType {
     //     (self.candidate_list, self.count_storer) = count_and_clean(self.candidate_list.clone(), max)
     // }
 
-    // fn show(&self) {
-    //     println!(
-    //         "CandidateHandler with {} candidates",
-    //         self.candidate_list.len()
-    //     );
-    // }
-    // fn show_details(&self) {
-    //     self.show();
-    //     for candidate in &self.candidate_list {
-    //         candidate.show();
-    //     }
-    // }
+    fn show(&self) {
+        println!(
+            "CandidateHandler with {} candidates",
+            self.candidate_list.len()
+        );
+    }
+    fn show_details(&self) {
+        self.show();
+        for candidate in &self.candidate_list {
+            candidate.show();
+        }
+    }
 }
 // impl StrategyCounterTrait for CandidateHandlerType {
 //     fn count(&self, max: Option<usize>) -> StrategyCounter {
@@ -549,39 +594,52 @@ fn test_candidatehandlertype() {
     // or different color (20 10x2 02)
     assert_eq!(cht.len(), 2);
 
-    // cht.update_count_storer(None);
+    assert_eq!(*cht.count(), StrategyCounter::Unfinished { count: 3 });
 
-    // assert_eq!(cht.count(None), StrategyCounter::Unfinished { count: 3 });
+    //////////////////////////////////////////
+    // now with only three as input
+    let mut cht = CandidateHandlerType::create_next_candidates(
+        vec![
+            CodeType::new(vec![0, 0]),
+            CodeType::new(vec![1, 0]),
+            CodeType::new(vec![0, 1]),
+        ],
+        &config,
+    );
+    // now there will be three candidates:
+    // 00 will get 20 and 10x2
+    // 10 or 01 will get 20, 10, 02 -> partially finished!
+    // 11 will get 00 and 10 x 2
+    assert_eq!(cht.len(), 3);
 
-    // //////////////////////////////////////////
-    // // now with only three as input
-    // let mut cht = CandidateHandlerType::create_next_candidates(
-    //     vec![
-    //         CodeType::new(vec![0, 0]),
-    //         CodeType::new(vec![1, 0]),
-    //         CodeType::new(vec![0, 1]),
-    //     ],
-    //     &config,
-    // );
-    // // now there will be three candidates:
-    // // 00 will get 20 and 10x2
-    // // 10 or 01 will get 20, 10, 02 -> partially finished!
-    // // 11 will get 00 and 10 x 2
-    // assert_eq!(cht.len(), 3);
+    cht.count();
+    assert_eq!(*cht.count(), StrategyCounter::Unfinished { count: 5 });
+    // Note: this could also be considered as PartiallyFinished since one of the paths is finished
+    // 10 will calculate a partial finish at 5
 
-    // cht.update_count_storer(None);
-    // assert_eq!(
-    //     cht.count(None),
-    //     StrategyCounter::PartiallyFinished { count: 5 } // 10 will calculate a partial finish at 5
-    // );
+    //////////////////////////////////////////
+    //  just a check on the high-level
+    let config64 = ConfigType {
+        colors: 6,
+        columns: 4,
+    };
+    // still needed?
+    let cht = StrategyHandlerType::new(&config64);
+    assert_eq!(cht.candidate_handling.number_of_candidates_next_input(), 5);
+}
 
-    // //////////////////////////////////////////
-    // //  just a check on the high-level
-    // let config64 = ConfigType {
-    //     colors: 6,
-    //     columns: 4,
-    // };
-    // // still needed?
-    // let cht = CandidateHandlerType::instantiate(&config64);
-    // assert_eq!(cht.len(), 5);
+/// High level type to handle the solving process
+pub struct StrategyHandlerType<'a> {
+    configuration: &'a ConfigType,
+    candidate_handling: CandidateHandlerType,
+}
+impl StrategyHandlerType<'_> {
+    pub fn new<'a>(config: &'a ConfigType) -> StrategyHandlerType<'a> {
+        StrategyHandlerType {
+            configuration: config,
+            candidate_handling: CandidateHandlerType::new(&config),
+        }
+    }
+
+    pub fn solve(&mut self) {}
 }
