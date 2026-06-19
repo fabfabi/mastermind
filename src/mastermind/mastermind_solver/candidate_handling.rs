@@ -435,7 +435,7 @@ fn test_candidate_handler_propagation() {
     let a = 2;
     assert_eq!(
         *result_handler.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 6 }
+        StrategyCounter::FINISHED { count: 6 }
     );
     result_handler.propagate_next_level(configuration);
     // result_handler.show_details();

@@ -34,9 +34,9 @@ impl StrategyCounter {
     /// returns the count estimate
     pub fn get_count_estimate(&self) -> u16 {
         return match *self {
+            Self::PENDING { count } => count,
             Self::PARTIALLY_FINISHED { count } => count,
             Self::FINISHED { count } => count,
-            Self::PENDING { count } => count,
         };
     }
 
@@ -50,9 +50,9 @@ impl StrategyCounter {
     /// takes a reference and decides whether to keep the branch behind this counter
     pub fn keep(&self, count_reference: u16) -> bool {
         return match *self {
+            Self::PENDING { count } => count <= count_reference,
             Self::PARTIALLY_FINISHED { count } => count <= count_reference,
             Self::FINISHED { count } => count <= count_reference,
-            _ => true,
         };
     }
 }
