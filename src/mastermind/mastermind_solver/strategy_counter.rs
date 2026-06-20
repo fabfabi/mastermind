@@ -64,7 +64,7 @@ impl fmt::Display for StrategyCounter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match *self {
             Self::PENDING { count } => format!("PENDING({})", count),
-            Self::PARTIALLY_FINISHED { count } => format!("PARTIAl({})", count),
+            Self::PARTIALLY_FINISHED { count } => format!("PARTIAL({})", count),
             Self::FINISHED { count } => format!("FINISHED({})", count),
         };
         write!(f, "{}", s)

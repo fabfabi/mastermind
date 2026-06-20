@@ -6,6 +6,7 @@ use crate::mastermind::mastermind_mechanics::grade;
 use crate::mastermind::mastermind_mechanics::CodeType;
 use crate::mastermind::mastermind_mechanics::ConfigType;
 use crate::mastermind::mastermind_mechanics::ResultType;
+use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
 use std::collections::HashMap;
 // use std::hash::Hash;
@@ -80,6 +81,14 @@ impl CandidateResultHashMap {
         }
     }
 
+    /// return the handler of a certain result
+    pub fn get_handler(&self, result: &ResultType) -> Option<&CandidateHandlerType> {
+        return match self {
+            Self::NEW(..) => panic!("Solution is not yet found, there are more levels"),
+            Self::PROPAGATED(hm) => hm.get(result),
+        };
+    }
+
     /// compare two CandidateResultHashmaps
     /// These are defined same if there are same numbers of candidates behind the same results
     pub fn eq(&self, other: &Self) -> bool {
@@ -127,7 +136,7 @@ impl CandidateResultHashMap {
                 //     indentation
                 // );
                 for (k, v) in hm.iter() {
-                    println!("{} {} -> {} groups", head_str, k, v.len());
+                    println!("{} {} -> {} codes", head_str, k, v.len());
                     // same groups will not show the header again
                     head_str = " ".repeat(head_str.len())
                 }
@@ -461,6 +470,7 @@ impl CandidateHandlerType {
 
     fn show(&self) {
         println!("{}", "#".repeat(30),);
+        println!("Candidate Handler count: {}", self.counter_stored);
         self.show_details(0);
     }
     fn show_details(&self, indentation: usize) {
@@ -471,305 +481,411 @@ impl CandidateHandlerType {
     }
 }
 
+enum StrategyExecutionType<'a> {
+    GUESS {
+        handler_candidate: &'a CandidateHandlerType,
+    },
+    RESPOND {
+        handler_result: &'a CandidateResultHashMap,
+    },
+    FINISHED,
+}
+impl<'a> StrategyExecutionType<'a> {
+    pub fn new(candidates: &'a CandidateHandlerType) -> Self {
+        StrategyExecutionType::GUESS {
+            handler_candidate: &candidates,
+        }
+    }
+    /// retrieves the next guess and changes the state to RESPOND
+    pub fn get_guess(&mut self) -> CodeType {
+        return match self {
+            Self::GUESS {
+                handler_candidate: candidate,
+            } => {
+                let candidate_result = candidate.candidate_list.first().unwrap();
+
+                let guess = candidate_result.candidate.clone();
+
+                *self = StrategyExecutionType::RESPOND {
+                    handler_result: &candidate_result.result_hashmap,
+                };
+                guess
+            }
+            Self::RESPOND { .. } => panic!("Guess was already returned"),
+            Self::FINISHED => panic!("Execution already Finished"),
+        };
+    }
+    /// enter the result of a guess and changes the state to GUESS or FINISHED
+    pub fn enter_result(&mut self, result: ResultType) {
+        match self {
+            Self::GUESS { .. } => panic!("Result of last guess was already returned"),
+            Self::RESPOND { handler_result } => {
+                if let Some(cht) = handler_result.get_handler(&result) {
+                    *self = StrategyExecutionType::GUESS {
+                        handler_candidate: cht,
+                    }
+                } else {
+                    *self = StrategyExecutionType::FINISHED
+                }
+            }
+            Self::FINISHED => panic!("Execution already Finished"),
+        }
+    }
+    /// if a StrategyExecutionType has finished
+    pub fn is_finished(&self) -> bool {
+        return match self {
+            Self::FINISHED => true,
+            _ => false,
+        };
+    }
+}
+
 /// High level type to handle the solving process
 pub struct StrategyHandlerType<'a> {
     configuration: &'a ConfigType,
-    candidate_handling: CandidateHandlerType,
+    handler_candidates: CandidateHandlerType,
 }
 impl StrategyHandlerType<'_> {
     pub fn new<'a>(config: &'a ConfigType) -> StrategyHandlerType<'a> {
         StrategyHandlerType {
             configuration: config,
-            candidate_handling: CandidateHandlerType::new(&config),
+            handler_candidates: CandidateHandlerType::new(&config),
         }
     }
 
-    pub fn solve(&mut self) {}
+    /// solve to find the best strategy
+    pub fn solve(&mut self) {
+        while !self.handler_candidates.counter_stored.is_finished() {
+            self.handler_candidates
+                .propagate_next_level(self.configuration);
+            self.handler_candidates.count();
+        }
+    }
+
+    /// verify the count of the strategy
+    pub fn verify(self) {
+        todo!()
+    }
 }
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/// Testing begins
+/////////////////////////////////////////////////////////////////////////////////////////////////
+#[cfg(test)]
+mod test_candidate_handling {
+    use super::*;
 
-#[test]
-fn test_result_handler_basics() {
-    let guesses = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![1, 1, 1, 1]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-    ];
+    #[test]
+    fn test_result_handler_basics() {
+        let guesses = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![1, 1, 1, 1]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+        ];
 
-    let solution = CodeType::new(vec![1, 2, 3, 4]);
-    let result_handler = CandidateResultType::new(&guesses, &solution);
+        let solution = CodeType::new(vec![1, 2, 3, 4]);
+        let result_handler = CandidateResultType::new(&guesses, &solution);
 
-    assert!(result_handler.contains(&ResultType::new(4, 0)));
-    assert!(result_handler.contains(&ResultType::new(1, 0)));
-    assert!(!result_handler.contains(&ResultType::new(1, 1)));
-    assert_eq!(result_handler.num_results(), 2);
+        assert!(result_handler.contains(&ResultType::new(4, 0)));
+        assert!(result_handler.contains(&ResultType::new(1, 0)));
+        assert!(!result_handler.contains(&ResultType::new(1, 1)));
+        assert_eq!(result_handler.num_results(), 2);
 
-    assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
-    assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
+        assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
+        assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
 
-    // assert!(matches!(
-    //     result_handler.count(None),
-    //     StrategyCounter::Unfinished { count: 9 }
-    // ));
+        // assert!(matches!(
+        //     result_handler.count(None),
+        //     StrategyCounter::Unfinished { count: 9 }
+        // ));
 
-    // example that should not be equal to above
-    let guesses_neq = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-    ];
-    let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
-    assert!(!result_handler.eq(&result_handler_neq));
+        // example that should not be equal to above
+        let guesses_neq = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+        ];
+        let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
+        assert!(!result_handler.eq(&result_handler_neq));
 
-    //another example that should be equal to the result handler
-    let guesses_eq = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-        CodeType::new(vec![0, 2, 0, 0]),
-    ];
-    let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
-    assert!(result_handler.eq(&result_handler_eq));
-    assert!(result_handler.candidate.eq(&solution));
+        //another example that should be equal to the result handler
+        let guesses_eq = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![2, 2, 2, 2]),
+            CodeType::new(vec![3, 3, 3, 3]),
+            CodeType::new(vec![4, 4, 4, 4]),
+            CodeType::new(vec![0, 2, 0, 0]),
+        ];
+        let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
+        assert!(result_handler.eq(&result_handler_eq));
+        assert!(result_handler.candidate.eq(&solution));
 
-    //now testing also the count -> for only one result
-    let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
-    let mut result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
+        //now testing also the count -> for only one result
+        let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
+        let mut result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
 
-    assert_eq!(
-        *result_handler_cnt1.count(),
-        StrategyCounter::FINISHED { count: 1 }
-    );
+        assert_eq!(
+            *result_handler_cnt1.count(),
+            StrategyCounter::FINISHED { count: 1 }
+        );
 
-    //now testing also the count -> for two results
-    let guesses_cnt2 = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![1, 2, 3, 5]),
-    ];
-    let mut result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+        //now testing also the count -> for two results
+        let guesses_cnt2 = vec![
+            CodeType::new(vec![1, 2, 3, 4]),
+            CodeType::new(vec![1, 2, 3, 5]),
+        ];
+        let mut result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
 
-    // note: this should become 3 but I did not want to implement into CandidateResultHashmap.count to check
-    // whether the finished solution is contained. If this changes -> 3
-    assert_eq!(
-        *result_handler_cnt2.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 3 }
-    );
+        // note: this should become 3 but I did not want to implement into CandidateResultHashmap.count to check
+        // whether the finished solution is contained. If this changes -> 3
+        assert_eq!(
+            *result_handler_cnt2.count(),
+            StrategyCounter::PARTIALLY_FINISHED { count: 3 }
+        );
 
-    // // check if the Obsolete path works --> Obsolete is removed
-    // assert_eq!(
-    //     result_handler_cnt2.count(),
-    //     StrategyCounter::Obsolete // not better than the other one -> obsolete
-    // );
-}
+        // // check if the Obsolete path works --> Obsolete is removed
+        // assert_eq!(
+        //     result_handler_cnt2.count(),
+        //     StrategyCounter::Obsolete // not better than the other one -> obsolete
+        // );
+    }
 
-#[test]
-fn test_candidatehandlertype_basic() {
-    // this is just the basic testing without the propagation
-    let config = ConfigType {
-        colors: 2,
-        columns: 2,
-    };
-    let cht_one =
-        CandidateHandlerType::create_next_candidates(vec![CodeType::new(vec![0, 0])], &config);
+    #[test]
+    fn test_candidatehandlertype_basic() {
+        // this is just the basic testing without the propagation
+        let config = ConfigType {
+            colors: 2,
+            columns: 2,
+        };
+        let cht_one =
+            CandidateHandlerType::create_next_candidates(vec![CodeType::new(vec![0, 0])], &config);
 
-    assert_eq!(cht_one.len(), 1);
-    assert!(cht_one.is_finished());
+        assert_eq!(cht_one.len(), 1);
+        assert!(cht_one.is_finished());
 
-    let mut cht = CandidateHandlerType::create_next_candidates(
-        vec![
-            CodeType::new(vec![0, 0]),
-            CodeType::new(vec![1, 0]),
-            CodeType::new(vec![0, 1]),
-            CodeType::new(vec![1, 1]),
-        ],
-        &config,
-    );
+        let mut cht = CandidateHandlerType::create_next_candidates(
+            vec![
+                CodeType::new(vec![0, 0]),
+                CodeType::new(vec![1, 0]),
+                CodeType::new(vec![0, 1]),
+                CodeType::new(vec![1, 1]),
+            ],
+            &config,
+        );
 
-    // there should be only two candidates.
-    // Same color (20, 10x2, 00 as results where 10x2 means 1 correct ones and 0 correct positions with 2 codes)
-    // or different color (20 10x2 02)
-    assert_eq!(cht.len(), 2);
-    cht.count();
-    // cht.show_details(0);
-    assert_eq!(
-        cht.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 7 }
-    );
+        // there should be only two candidates.
+        // Same color (20, 10x2, 00 as results where 10x2 means 1 correct ones and 0 correct positions with 2 codes)
+        // or different color (20 10x2 02)
+        assert_eq!(cht.len(), 2);
+        cht.count();
+        // cht.show_details(0);
+        assert_eq!(
+            cht.counter_stored,
+            StrategyCounter::PARTIALLY_FINISHED { count: 7 }
+        );
 
-    //////////////////////////////////////////
-    // now with only three as input
-    let mut cht = CandidateHandlerType::create_next_candidates(
-        vec![
-            CodeType::new(vec![0, 0]),
-            CodeType::new(vec![1, 0]),
-            CodeType::new(vec![0, 1]),
-        ],
-        &config,
-    );
-    // now there will be three candidates:
-    // 00 will get 20 and 10x2
-    // 10 or 01 will get 20, 10, 02 -> partially finished!
-    // 11 will get 00 and 10 x 2
-    assert_eq!(cht.len(), 3);
+        //////////////////////////////////////////
+        // now with only three as input
+        let mut cht = CandidateHandlerType::create_next_candidates(
+            vec![
+                CodeType::new(vec![0, 0]),
+                CodeType::new(vec![1, 0]),
+                CodeType::new(vec![0, 1]),
+            ],
+            &config,
+        );
+        // now there will be three candidates:
+        // 00 will get 20 and 10x2
+        // 10 or 01 will get 20, 10, 02 -> partially finished!
+        // 11 will get 00 and 10 x 2
+        assert_eq!(cht.len(), 3);
 
-    cht.count();
-    assert_eq!(
-        *cht.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
-    );
-    // Note: this could also be considered as PartiallyFinished since one of the paths is finished
-    // 10 will calculate a partial finish at 5
+        cht.count();
+        assert_eq!(
+            *cht.count(),
+            StrategyCounter::PARTIALLY_FINISHED { count: 5 }
+        );
+        // Note: this could also be considered as PartiallyFinished since one of the paths is finished
+        // 10 will calculate a partial finish at 5
 
-    //////////////////////////////////////////
-    //  just a check on the high-level
-    let config64 = ConfigType {
-        colors: 6,
-        columns: 4,
-    };
-    // still needed?
-    let cht = StrategyHandlerType::new(&config64);
-    assert_eq!(cht.candidate_handling.number_of_candidates_next_input(), 5);
-}
-#[test]
-fn test_candidate_handler_propagation2() {
-    let configuration = &ConfigType {
-        columns: 3,
-        colors: 4,
-    };
-    // trivial case.
-    // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
-    let guesses = vec![
-        CodeType::new(vec![0, 0, 1]),
-        CodeType::new(vec![0, 1, 2]),
-        CodeType::new(vec![3, 0, 0]),
-    ];
-    let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
-    result_handler.count();
-    result_handler.show_details(0);
+        //////////////////////////////////////////
+        //  just a check on the high-level
+        let config64 = ConfigType {
+            colors: 6,
+            columns: 4,
+        };
+        // still needed?
+        let cht = StrategyHandlerType::new(&config64);
+        assert_eq!(cht.handler_candidates.number_of_candidates_next_input(), 5);
+    }
 
-    result_handler.propagate_next_level(configuration);
-    result_handler.count();
-    // result_handler.show_details(0);
+    #[test]
+    fn test_candidate_handler_propagation2() {
+        let configuration = &ConfigType {
+            columns: 3,
+            colors: 4,
+        };
+        // trivial case.
+        // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
+        let guesses = vec![
+            CodeType::new(vec![0, 0, 1]),
+            CodeType::new(vec![0, 1, 2]),
+            CodeType::new(vec![3, 0, 0]),
+        ];
+        let mut result_handler =
+            CandidateHandlerType::create_next_candidates(guesses, &configuration);
+        result_handler.count();
+        result_handler.show();
 
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
-    );
+        result_handler.propagate_next_level(configuration);
+        result_handler.count();
+        // result_handler.show();
 
-    result_handler.propagate_next_level(configuration);
-    result_handler.count();
-    result_handler.show_details(0);
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::FINISHED { count: 5 }
-    );
-}
-#[test]
-fn test_candidate_handler_propagation() {
-    let configuration = &ConfigType {
-        columns: 3,
-        colors: 5,
-    };
-    let guesses = vec![
-        CodeType::new(vec![1, 1, 1]),
-        CodeType::new(vec![2, 2, 2]),
-        CodeType::new(vec![3, 3, 3]),
-        CodeType::new(vec![4, 4, 4]),
-    ];
-    let mut handler_candidate =
-        CandidateHandlerType::create_next_candidates(guesses, &configuration);
-    assert_eq!(
-        handler_candidate.counter_stored,
-        StrategyCounter::PENDING { count: 7 }
-    );
-    // update the counter
-    handler_candidate.count();
-    // handler_candidate.show_details();
+        assert_eq!(
+            result_handler.counter_stored,
+            StrategyCounter::PARTIALLY_FINISHED { count: 5 }
+        );
 
-    assert_eq!(
-        handler_candidate.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 7 }
-    );
-    handler_candidate.propagate_next_level(configuration);
-    // handler_candidate.show_details();
-    let a = 2;
-    assert_eq!(
-        *handler_candidate.count(),
-        StrategyCounter::FINISHED { count: 6 }
-    );
-    handler_candidate.propagate_next_level(configuration);
-    // handler_candidate.show_details();
-    let a = 2;
-    assert_eq!(
-        *handler_candidate.count(),
-        StrategyCounter::FINISHED { count: 6 }
-    );
-}
+        result_handler.propagate_next_level(configuration);
+        result_handler.count();
+        result_handler.show();
+        assert_eq!(
+            result_handler.counter_stored,
+            StrategyCounter::PARTIALLY_FINISHED { count: 5 }
+        );
+        result_handler.propagate_next_level(configuration);
+        result_handler.count();
+        result_handler.show();
+        assert_eq!(
+            result_handler.counter_stored,
+            StrategyCounter::FINISHED { count: 5 }
+        );
+    }
+    #[test]
+    fn test_candidate_handler_propagation() {
+        let configuration = &ConfigType {
+            columns: 3,
+            colors: 5,
+        };
+        let guesses = vec![
+            CodeType::new(vec![1, 1, 1]),
+            CodeType::new(vec![2, 2, 2]),
+            CodeType::new(vec![3, 3, 3]),
+            CodeType::new(vec![4, 4, 4]),
+        ];
+        let mut handler_candidate =
+            CandidateHandlerType::create_next_candidates(guesses, &configuration);
+        assert_eq!(
+            handler_candidate.counter_stored,
+            StrategyCounter::PENDING { count: 7 }
+        );
+        // update the counter
+        handler_candidate.count();
+        // handler_candidate.show_details();
 
-#[test]
-fn test_candidatehandlertype_basic_1_step() {
-    // this is just a super basic test to review the mechanics.
-    // this always solves after one propagation
-    let config = ConfigType {
-        colors: 2,
-        columns: 2,
-    };
+        assert_eq!(
+            handler_candidate.counter_stored,
+            StrategyCounter::PARTIALLY_FINISHED { count: 7 }
+        );
+        handler_candidate.propagate_next_level(configuration);
+        // handler_candidate.show_details();
+        let a = 2;
+        assert_eq!(
+            *handler_candidate.count(),
+            StrategyCounter::FINISHED { count: 6 }
+        );
+        handler_candidate.propagate_next_level(configuration);
+        // handler_candidate.show_details();
+        let a = 2;
+        assert_eq!(
+            *handler_candidate.count(),
+            StrategyCounter::FINISHED { count: 6 }
+        );
+    }
+    /// test function to verify an expectation when solving for a configuration
+    fn test_solver(configuration: &ConfigType, counter_expectation: Vec<StrategyCounter>) {
+        let mut handler = CandidateHandlerType::new(configuration);
+        let count_last = counter_expectation.last().unwrap().clone();
+        for counter in counter_expectation {
+            // default setting -> expected to be solved in best case 7
+            handler.show();
+            assert_eq!(handler.counter_stored, counter);
 
-    let mut handler = CandidateHandlerType::new(&config);
+            handler.propagate_next_level(configuration);
+            handler.count();
+        }
+        // check the last one - nothing changes once a CandidateHandler is FINISHED.
+        assert_eq!(handler.counter_stored, count_last);
 
-    // default setting -> expected to be solved in best case 7
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::PENDING { count: 7 }
-    );
+        assert!(handler.is_finished())
+    }
+    #[test]
+    fn test_candidatehandlertype_basic_1_step() {
+        // this is just a super basic test to review the mechanics.
+        // this solves after one propagation
+        let config = ConfigType {
+            colors: 2,
+            columns: 2,
+        };
 
-    handler.propagate_next_level(&config);
-    handler.count();
+        let counts = vec![
+            StrategyCounter::PENDING { count: 7 },
+            StrategyCounter::FINISHED { count: 7 },
+        ];
+        test_solver(&config, counts);
+    }
 
-    // next propagation directly solves this issue
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::FINISHED { count: 7 }
-    );
+    #[test]
+    fn test_candidatehandlertype_basic_2_steps() {
+        // this is just the basic testing without the propagation
+        // this solves after two propagations
+        let config = ConfigType {
+            colors: 3,
+            columns: 2,
+        };
 
-    handler.show_details(0);
-}
+        let counts = vec![
+            StrategyCounter::PENDING { count: 17 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 20 }, // ATTENTION: THIS DECREASES COUNT!!!
+            StrategyCounter::FINISHED { count: 19 },
+        ];
+        test_solver(&config, counts);
+    }
+    // #[test]
+    // fn test_candidatehandlertype_basic_3_steps() {
+    //     // this is just the basic testing without the propagation
+    //     // this solves after two propagations
+    //     let config = ConfigType {
+    //         colors: 3,
+    //         columns: 3,
+    //     };
 
-#[test]
-fn test_candidatehandlertype_basic_2_steps() {
-    // this is just the basic testing without the propagation
-    let config = ConfigType {
-        colors: 3,
-        columns: 2,
-    };
+    //     let counts = vec![
+    //         StrategyCounter::PENDING { count: 31 },
+    //         StrategyCounter::PARTIALLY_FINISHED { count: 43 },
+    //         StrategyCounter::FINISHED { count: 40 },
+    //     ];
+    //     test_solver(&config, counts);
+    // }
 
-    let mut handler = CandidateHandlerType::new(&config);
+    #[test]
+    fn test_candidatehandlertype_basic_3_steps() {
+        // this is just the basic testing without the propagation
+        // this solves after two propagations
+        let config = ConfigType {
+            colors: 2,
+            columns: 3,
+        };
 
-    // default setting -> expected to be solved in best case 7
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::PENDING { count: 17 }
-    );
-
-    handler.propagate_next_level(&config);
-    handler.count();
-    handler.show();
-
-    // next propagation directly solves this issue
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 20 }
-    );
-
-    handler.propagate_next_level(&config);
-    handler.count();
-    handler.show();
-
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::FINISHED { count: 19 }
-    );
+        let counts = vec![
+            StrategyCounter::PENDING { count: 15 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 17 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
+        ];
+        test_solver(&config, counts);
+    }
 }
