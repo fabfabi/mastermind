@@ -48,7 +48,7 @@ impl CandidateResultHashMap {
                 hashmap
                     .values_mut()
                     //not entirely sure if that filter is needed
-                    .filter(|x| !x.is_done())
+                    .filter(|x| !x.is_finished())
                     .for_each(|x| x.propagate_next_level(configuration));
             }
         }
@@ -197,7 +197,7 @@ impl CandidateResultHashMap {
                 // return DONE if all are DONE otherwise unfinished
                 // this is detected by the closure for the return type
                 let get_return_type = |count_total: u16| {
-                    if hm.values().all(|x| x.is_done()) {
+                    if hm.values().all(|x| x.is_finished()) {
                         return StrategyCounter::FINISHED { count: count_total };
                     }
                     StrategyCounter::PENDING { count: count_total }
@@ -446,9 +446,17 @@ impl CandidateHandlerType {
         self.candidate_list.push(candidate)
     }
 
-    /// if this is the last entry, i.e. only one candidate left
-    fn is_done(&self) -> bool {
-        return self.candidate_list.len() == 1;
+    /// if this path is finished.
+    ///
+    /// There are two ways to detect:
+    /// * if there is just one candidate left (for later steps)
+    /// * via the StrategyCounter which can also propagate the status upwards.
+    fn is_finished(&self) -> bool {
+        return match self.counter_stored {
+            StrategyCounter::FINISHED { count: _ } => true,
+            _ => false,
+        };
+        // return self.candidate_list.len() == 1;
     }
 
     fn show(&self) {
@@ -568,7 +576,7 @@ fn test_candidatehandlertype_basic() {
         CandidateHandlerType::create_next_candidates(vec![CodeType::new(vec![0, 0])], &config);
 
     assert_eq!(cht_one.len(), 1);
-    assert!(cht_one.is_done());
+    assert!(cht_one.is_finished());
 
     let mut cht = CandidateHandlerType::create_next_candidates(
         vec![
@@ -702,8 +710,9 @@ fn test_candidate_handler_propagation() {
 }
 
 #[test]
-fn test_candidatehandlertype_super_basic() {
-    // this is just a super basic test to review the mechanics. this always solves in 2 steps
+fn test_candidatehandlertype_basic_1_step() {
+    // this is just a super basic test to review the mechanics.
+    // this always solves after one propagation
     let config = ConfigType {
         colors: 2,
         columns: 2,
@@ -730,7 +739,7 @@ fn test_candidatehandlertype_super_basic() {
 }
 
 #[test]
-fn test_candidatehandlertype_super_basic2() {
+fn test_candidatehandlertype_basic_2_steps() {
     // this is just the basic testing without the propagation
     let config = ConfigType {
         colors: 3,
@@ -761,15 +770,6 @@ fn test_candidatehandlertype_super_basic2() {
 
     assert_eq!(
         handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 19 }
-    );
-
-    handler.propagate_next_level(&config);
-    handler.count();
-    handler.show();
-
-    assert_eq!(
-        handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 19 }
+        StrategyCounter::FINISHED { count: 19 }
     );
 }
