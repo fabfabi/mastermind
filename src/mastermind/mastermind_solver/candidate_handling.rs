@@ -144,8 +144,8 @@ impl CandidateResultHashMap {
                 }
             }
             Self::PROPAGATED(hm) => {
-                info!("{}", head_str,);
                 for (k, v) in hm.iter() {
+                    info!("{} => {}", head_str, k);
                     v.show_details(indentation + 1);
                     // same groups will not show the header again
                     head_str = " ".repeat(head_str.len())
@@ -297,6 +297,11 @@ impl CandidateResultType {
             "'{}' '{}', #{}",
             self.candidate, self.counter_stored, self.number_of_candidates
         )
+    }
+
+    /// return the candidate that is entered at this step
+    fn get_guess(&self) -> CodeType {
+        self.candidate.clone()
     }
 
     /// show a high-level summary
@@ -457,6 +462,11 @@ impl CandidateHandlerType {
         self.candidate_list.push(candidate)
     }
 
+    /// get the next guess
+    fn get_candidate(&self) -> &CandidateResultType {
+        self.candidate_list.first().unwrap()
+    }
+
     /// if this path is finished.
     ///
     /// There are two ways to detect:
@@ -505,11 +515,11 @@ impl<'a> StrategyExecutionType<'a> {
     pub fn get_guess(&mut self) -> CodeType {
         return match self {
             Self::GUESS {
-                handler_candidate: candidate,
+                handler_candidate: handler,
             } => {
-                let candidate_result = candidate.candidate_list.first().unwrap();
+                let candidate_result = handler.get_candidate();
 
-                let guess = candidate_result.candidate.clone();
+                let guess = candidate_result.get_guess();
 
                 *self = StrategyExecutionType::RESPOND {
                     handler_result: &candidate_result.result_hashmap,
@@ -866,27 +876,12 @@ mod test_candidate_handling {
             StrategyCounter::FINISHED { count: 6 }
         );
     }
-    /// test function to verify an expectation when solving for a configuration
-    fn test_solver(configuration: &ConfigType, counter_expectation: Vec<StrategyCounter>) {
-        let mut handler = CandidateHandlerType::new(configuration);
-        let count_last = counter_expectation.last().unwrap().clone();
-        for counter in counter_expectation {
-            // default setting -> expected to be solved in best case 7
-            handler.show();
-            assert_eq!(handler.counter_stored, counter);
 
-            handler.propagate_next_level(configuration);
-            handler.count();
-        }
-        // check the last one - nothing changes once a CandidateHandler is FINISHED.
-        assert_eq!(handler.counter_stored, count_last);
-
-        assert!(handler.is_finished())
-    }
     #[test]
     fn test_candidatehandlertype_basic_1_step() {
         // this is just a super basic test to review the mechanics.
         // this solves after one propagation
+        logger_initiate(None);
         let config = ConfigType {
             colors: 2,
             columns: 2,
@@ -896,11 +891,15 @@ mod test_candidate_handling {
             StrategyCounter::PENDING { count: 7 },
             StrategyCounter::FINISHED { count: 7 },
         ];
-        test_solver(&config, counts);
+        // test_solver(&config, counts);
+        let mut sht = StrategyHandlerType::new(&config);
+        sht.test_solve(counts);
+        sht.verify();
     }
 
     #[test]
     fn test_candidatehandlertype_basic_2_steps() {
+        logger_initiate(None);
         // this is just the basic testing without the propagation
         // this solves after two propagations
         let config = ConfigType {
@@ -939,6 +938,7 @@ mod test_candidate_handling {
     fn test_candidatehandlertype_basic_3_steps() {
         // this is just the basic testing without the propagation
         // this solves after two propagations
+        logger_initiate(None);
         let config = ConfigType {
             colors: 2,
             columns: 3,
@@ -951,6 +951,9 @@ mod test_candidate_handling {
             StrategyCounter::PARTIALLY_FINISHED { count: 20 },
             StrategyCounter::PARTIALLY_FINISHED { count: 20 },
         ];
-        test_solver(&config, counts);
+        let mut sht = StrategyHandlerType::new(&config);
+        sht.test_solve(counts);
+
+        sht.verify();
     }
 }
