@@ -19,11 +19,11 @@ use std::collections::HashMap;
 /// Unfortunately a TypeState Pattern will require a Statemachine to be type-safe
 /// which is introducing more boilerplate than it resolves.
 /// see: https://users.rust-lang.org/t/how-to-implement-typestate-instead-of-enums-for/140769
-enum CandidateResultHashmap {
+enum CandidateResultHashMap {
     NEW(HashMap<ResultType, Vec<CodeType>>),
     PROPAGATED(HashMap<ResultType, CandidateHandlerType>),
 }
-impl CandidateResultHashmap {
+impl CandidateResultHashMap {
     /// Create the next level of candidates.
     ///
     /// The propagation stops when a CandidateResultHandler is in status done.
@@ -74,8 +74,10 @@ impl CandidateResultHashmap {
             if let Some(entries) = hm.get(result) {
                 return entries.len();
             }
+            return 0;
+        } else {
+            panic!("This logic should only be checked for CandidateResultHashmap::NEW when creating new Hashmaps");
         }
-        return 0;
     }
 
     /// compare two CandidateResultHashmaps
@@ -101,34 +103,41 @@ impl CandidateResultHashmap {
     //     }
     // }
 
+    fn tell(&self) -> String {
+        match self {
+            Self::NEW(_) => "CandidateResultHashMap::NEW",
+            Self::PROPAGATED(_) => "CandidateResultHashMap::PROPAGATED",
+        }
+        .into()
+    }
+
     /// show the output
-    pub fn show_details(&self, indentation: usize) {
+    pub fn show_details(&self, indentation: usize, head: Option<String>) {
+        let mut head_str = format!(
+            "{}{}: {}",
+            " ".repeat(indentation),
+            indentation,
+            head.unwrap_or("".into())
+        );
         match self {
             Self::NEW(hm) => {
-                println!(
-                    "{}{} CandidateResultHashmap::NEW",
-                    " ".repeat(indentation),
-                    indentation
-                );
+                // println!(
+                //     "{}{} CandidateResultHashmap::NEW",
+                //     " ".repeat(indentation),
+                //     indentation
+                // );
                 for (k, v) in hm.iter() {
-                    println!(
-                        "{}{} {}{}",
-                        " ".repeat(indentation),
-                        indentation,
-                        k,
-                        v.len()
-                    );
+                    println!("{} {} -> {} groups", head_str, k, v.len());
+                    // same groups will not show the header again
+                    head_str = " ".repeat(head_str.len())
                 }
             }
             Self::PROPAGATED(hm) => {
-                println!(
-                    "{}{} CandidateResultHashmap::PROPAGATED",
-                    " ".repeat(indentation),
-                    indentation
-                );
+                println!("{}", head_str,);
                 for (k, v) in hm.iter() {
-                    println!("{}{} {}", " ".repeat(indentation), indentation, k,);
                     v.show_details(indentation + 1);
+                    // same groups will not show the header again
+                    head_str = " ".repeat(head_str.len())
                 }
             }
         }
@@ -214,7 +223,7 @@ impl CandidateResultHashmap {
 /// This struct bridges to CandidateResultHashmap which acts as a state machine
 // #[derive(Clone)]
 struct CandidateResultType {
-    result_hashmap: CandidateResultHashmap,
+    result_hashmap: CandidateResultHashMap,
     candidate: CodeType,
     counter_stored: StrategyCounter,
     number_of_candidates: usize,
@@ -234,7 +243,7 @@ impl CandidateResultType {
 
         let n_candidates = guesses.len();
         return CandidateResultType {
-            result_hashmap: CandidateResultHashmap::NEW(map),
+            result_hashmap: CandidateResultHashMap::NEW(map),
             candidate: solution.clone(),
             counter_stored: StrategyCounter::new(n_candidates),
             number_of_candidates: n_candidates,
@@ -271,10 +280,18 @@ impl CandidateResultType {
         return &self.counter_stored;
     }
 
+    /// propagate the information of the Hashmap
+    fn tell(&self) -> String {
+        format!(
+            "'{}' '{}', #{}",
+            self.candidate, self.counter_stored, self.number_of_candidates
+        )
+    }
+
     /// show a high-level summary
     fn show(&self, indentation: usize) {
         println!(
-            "{}{} Candidate: '{}' with {} groups",
+            "{}{}: Candidate: '{}' with {} groups",
             " ".repeat(indentation),
             indentation,
             self.candidate,
@@ -283,167 +300,15 @@ impl CandidateResultType {
     }
 
     fn show_details(&self, indentation: usize) {
-        self.show(indentation);
-        self.result_hashmap.show_details(indentation);
+        // self.show(indentation);
+        self.result_hashmap
+            .show_details(indentation, Some(self.tell()));
     }
 
     ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
     fn eq(&self, other: &Self) -> bool {
         return self.result_hashmap.eq(&other.result_hashmap);
     }
-}
-
-#[test]
-fn test_result_handler_basics() {
-    let guesses = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![1, 1, 1, 1]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-    ];
-
-    let solution = CodeType::new(vec![1, 2, 3, 4]);
-    let result_handler = CandidateResultType::new(&guesses, &solution);
-
-    assert!(result_handler.contains(&ResultType::new(4, 0)));
-    assert!(result_handler.contains(&ResultType::new(1, 0)));
-    assert!(!result_handler.contains(&ResultType::new(1, 1)));
-    assert_eq!(result_handler.num_results(), 2);
-
-    assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
-    assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
-
-    // assert!(matches!(
-    //     result_handler.count(None),
-    //     StrategyCounter::Unfinished { count: 9 }
-    // ));
-
-    // example that should not be equal to above
-    let guesses_neq = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-    ];
-    let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
-    assert!(!result_handler.eq(&result_handler_neq));
-
-    //another example that should be equal to the result handler
-    let guesses_eq = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![2, 2, 2, 2]),
-        CodeType::new(vec![3, 3, 3, 3]),
-        CodeType::new(vec![4, 4, 4, 4]),
-        CodeType::new(vec![0, 2, 0, 0]),
-    ];
-    let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
-    assert!(result_handler.eq(&result_handler_eq));
-    assert!(result_handler.candidate.eq(&solution));
-
-    //now testing also the count -> for only one result
-    let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
-    let mut result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
-
-    assert_eq!(
-        *result_handler_cnt1.count(),
-        StrategyCounter::FINISHED { count: 1 }
-    );
-
-    //now testing also the count -> for two results
-    let guesses_cnt2 = vec![
-        CodeType::new(vec![1, 2, 3, 4]),
-        CodeType::new(vec![1, 2, 3, 5]),
-    ];
-    let mut result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
-
-    // note: this should become 3 but I did not want to implement into CandidateResultHashmap.count to check
-    // whether the finished solution is contained. If this changes -> 3
-    assert_eq!(
-        *result_handler_cnt2.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 4 }
-    );
-
-    // // check if the Obsolete path works --> Obsolete is removed
-    // assert_eq!(
-    //     result_handler_cnt2.count(),
-    //     StrategyCounter::Obsolete // not better than the other one -> obsolete
-    // );
-}
-
-#[test]
-fn test_candidate_handler_propagation2() {
-    let configuration = &ConfigType {
-        columns: 3,
-        colors: 4,
-    };
-    // trivial case.
-    // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
-    let guesses = vec![
-        CodeType::new(vec![0, 0, 1]),
-        CodeType::new(vec![0, 1, 2]),
-        CodeType::new(vec![3, 0, 0]),
-    ];
-    let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
-    result_handler.count();
-    result_handler.show_details(0);
-
-    result_handler.propagate_next_level(configuration);
-    result_handler.count();
-    result_handler.show_details(0);
-
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
-    );
-
-    result_handler.propagate_next_level(configuration);
-    result_handler.count();
-    result_handler.show_details(0);
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::FINISHED { count: 5 }
-    );
-}
-#[test]
-fn test_candidate_handler_propagation() {
-    let configuration = &ConfigType {
-        columns: 3,
-        colors: 5,
-    };
-    let guesses = vec![
-        CodeType::new(vec![1, 1, 1]),
-        CodeType::new(vec![2, 2, 2]),
-        CodeType::new(vec![3, 3, 3]),
-        CodeType::new(vec![4, 4, 4]),
-    ];
-    let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::PENDING { count: 7 }
-    );
-    // update the counter
-    result_handler.count();
-    // result_handler.show_details();
-
-    assert_eq!(
-        result_handler.counter_stored,
-        StrategyCounter::PARTIALLY_FINISHED { count: 7 }
-    );
-    result_handler.propagate_next_level(configuration);
-    // result_handler.show_details();
-    let a = 2;
-    assert_eq!(
-        *result_handler.count(),
-        StrategyCounter::FINISHED { count: 6 }
-    );
-    result_handler.propagate_next_level(configuration);
-    // result_handler.show_details();
-    let a = 2;
-    assert_eq!(
-        *result_handler.count(),
-        StrategyCounter::FINISHED { count: 6 }
-    );
 }
 
 /// class to identify the next inputs to test
@@ -586,20 +451,110 @@ impl CandidateHandlerType {
         return self.candidate_list.len() == 1;
     }
 
-    fn show(&self, indentation: usize) {
-        println!(
-            "{}{} CandidateHandler with {} candidates",
-            " ".repeat(indentation),
-            indentation,
-            self.candidate_list.len()
-        );
+    fn show(&self) {
+        println!("{}", "#".repeat(30),);
+        self.show_details(0);
     }
     fn show_details(&self, indentation: usize) {
-        self.show(indentation);
+        // self.show(indentation);
         for candidate in &self.candidate_list {
-            candidate.show_details(indentation + 1);
+            candidate.show_details(indentation);
         }
     }
+}
+
+/// High level type to handle the solving process
+pub struct StrategyHandlerType<'a> {
+    configuration: &'a ConfigType,
+    candidate_handling: CandidateHandlerType,
+}
+impl StrategyHandlerType<'_> {
+    pub fn new<'a>(config: &'a ConfigType) -> StrategyHandlerType<'a> {
+        StrategyHandlerType {
+            configuration: config,
+            candidate_handling: CandidateHandlerType::new(&config),
+        }
+    }
+
+    pub fn solve(&mut self) {}
+}
+
+#[test]
+fn test_result_handler_basics() {
+    let guesses = vec![
+        CodeType::new(vec![1, 2, 3, 4]),
+        CodeType::new(vec![1, 1, 1, 1]),
+        CodeType::new(vec![2, 2, 2, 2]),
+        CodeType::new(vec![3, 3, 3, 3]),
+        CodeType::new(vec![4, 4, 4, 4]),
+    ];
+
+    let solution = CodeType::new(vec![1, 2, 3, 4]);
+    let result_handler = CandidateResultType::new(&guesses, &solution);
+
+    assert!(result_handler.contains(&ResultType::new(4, 0)));
+    assert!(result_handler.contains(&ResultType::new(1, 0)));
+    assert!(!result_handler.contains(&ResultType::new(1, 1)));
+    assert_eq!(result_handler.num_results(), 2);
+
+    assert_eq!(result_handler.num_entries(&ResultType::new(4, 0)), 1);
+    assert_eq!(result_handler.num_entries(&ResultType::new(1, 0)), 4);
+
+    // assert!(matches!(
+    //     result_handler.count(None),
+    //     StrategyCounter::Unfinished { count: 9 }
+    // ));
+
+    // example that should not be equal to above
+    let guesses_neq = vec![
+        CodeType::new(vec![1, 2, 3, 4]),
+        CodeType::new(vec![2, 2, 2, 2]),
+        CodeType::new(vec![3, 3, 3, 3]),
+        CodeType::new(vec![4, 4, 4, 4]),
+    ];
+    let result_handler_neq = CandidateResultType::new(&guesses_neq, &solution);
+    assert!(!result_handler.eq(&result_handler_neq));
+
+    //another example that should be equal to the result handler
+    let guesses_eq = vec![
+        CodeType::new(vec![1, 2, 3, 4]),
+        CodeType::new(vec![2, 2, 2, 2]),
+        CodeType::new(vec![3, 3, 3, 3]),
+        CodeType::new(vec![4, 4, 4, 4]),
+        CodeType::new(vec![0, 2, 0, 0]),
+    ];
+    let result_handler_eq = CandidateResultType::new(&guesses_eq, &solution);
+    assert!(result_handler.eq(&result_handler_eq));
+    assert!(result_handler.candidate.eq(&solution));
+
+    //now testing also the count -> for only one result
+    let guesses_cnt1 = vec![CodeType::new(vec![1, 2, 3, 4])];
+    let mut result_handler_cnt1 = CandidateResultType::new(&guesses_cnt1, &solution);
+
+    assert_eq!(
+        *result_handler_cnt1.count(),
+        StrategyCounter::FINISHED { count: 1 }
+    );
+
+    //now testing also the count -> for two results
+    let guesses_cnt2 = vec![
+        CodeType::new(vec![1, 2, 3, 4]),
+        CodeType::new(vec![1, 2, 3, 5]),
+    ];
+    let mut result_handler_cnt2 = CandidateResultType::new(&guesses_cnt2, &solution);
+
+    // note: this should become 3 but I did not want to implement into CandidateResultHashmap.count to check
+    // whether the finished solution is contained. If this changes -> 3
+    assert_eq!(
+        *result_handler_cnt2.count(),
+        StrategyCounter::PARTIALLY_FINISHED { count: 3 }
+    );
+
+    // // check if the Obsolete path works --> Obsolete is removed
+    // assert_eq!(
+    //     result_handler_cnt2.count(),
+    //     StrategyCounter::Obsolete // not better than the other one -> obsolete
+    // );
 }
 
 #[test]
@@ -630,7 +585,7 @@ fn test_candidatehandlertype_basic() {
     // or different color (20 10x2 02)
     assert_eq!(cht.len(), 2);
     cht.count();
-    cht.show_details(0);
+    // cht.show_details(0);
     assert_eq!(
         cht.counter_stored,
         StrategyCounter::PARTIALLY_FINISHED { count: 7 }
@@ -655,7 +610,7 @@ fn test_candidatehandlertype_basic() {
     cht.count();
     assert_eq!(
         *cht.count(),
-        StrategyCounter::PARTIALLY_FINISHED { count: 6 }
+        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
     );
     // Note: this could also be considered as PartiallyFinished since one of the paths is finished
     // 10 will calculate a partial finish at 5
@@ -670,19 +625,151 @@ fn test_candidatehandlertype_basic() {
     let cht = StrategyHandlerType::new(&config64);
     assert_eq!(cht.candidate_handling.number_of_candidates_next_input(), 5);
 }
+#[test]
+fn test_candidate_handler_propagation2() {
+    let configuration = &ConfigType {
+        columns: 3,
+        colors: 4,
+    };
+    // trivial case.
+    // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
+    let guesses = vec![
+        CodeType::new(vec![0, 0, 1]),
+        CodeType::new(vec![0, 1, 2]),
+        CodeType::new(vec![3, 0, 0]),
+    ];
+    let mut result_handler = CandidateHandlerType::create_next_candidates(guesses, &configuration);
+    result_handler.count();
+    result_handler.show_details(0);
 
-/// High level type to handle the solving process
-pub struct StrategyHandlerType<'a> {
-    configuration: &'a ConfigType,
-    candidate_handling: CandidateHandlerType,
+    result_handler.propagate_next_level(configuration);
+    result_handler.count();
+    // result_handler.show_details(0);
+
+    assert_eq!(
+        result_handler.counter_stored,
+        StrategyCounter::PARTIALLY_FINISHED { count: 5 }
+    );
+
+    result_handler.propagate_next_level(configuration);
+    result_handler.count();
+    result_handler.show_details(0);
+    assert_eq!(
+        result_handler.counter_stored,
+        StrategyCounter::FINISHED { count: 5 }
+    );
 }
-impl StrategyHandlerType<'_> {
-    pub fn new<'a>(config: &'a ConfigType) -> StrategyHandlerType<'a> {
-        StrategyHandlerType {
-            configuration: config,
-            candidate_handling: CandidateHandlerType::new(&config),
-        }
-    }
+#[test]
+fn test_candidate_handler_propagation() {
+    let configuration = &ConfigType {
+        columns: 3,
+        colors: 5,
+    };
+    let guesses = vec![
+        CodeType::new(vec![1, 1, 1]),
+        CodeType::new(vec![2, 2, 2]),
+        CodeType::new(vec![3, 3, 3]),
+        CodeType::new(vec![4, 4, 4]),
+    ];
+    let mut handler_candidate =
+        CandidateHandlerType::create_next_candidates(guesses, &configuration);
+    assert_eq!(
+        handler_candidate.counter_stored,
+        StrategyCounter::PENDING { count: 7 }
+    );
+    // update the counter
+    handler_candidate.count();
+    // handler_candidate.show_details();
 
-    pub fn solve(&mut self) {}
+    assert_eq!(
+        handler_candidate.counter_stored,
+        StrategyCounter::PARTIALLY_FINISHED { count: 7 }
+    );
+    handler_candidate.propagate_next_level(configuration);
+    // handler_candidate.show_details();
+    let a = 2;
+    assert_eq!(
+        *handler_candidate.count(),
+        StrategyCounter::FINISHED { count: 6 }
+    );
+    handler_candidate.propagate_next_level(configuration);
+    // handler_candidate.show_details();
+    let a = 2;
+    assert_eq!(
+        *handler_candidate.count(),
+        StrategyCounter::FINISHED { count: 6 }
+    );
+}
+
+#[test]
+fn test_candidatehandlertype_super_basic() {
+    // this is just a super basic test to review the mechanics. this always solves in 2 steps
+    let config = ConfigType {
+        colors: 2,
+        columns: 2,
+    };
+
+    let mut handler = CandidateHandlerType::new(&config);
+
+    // default setting -> expected to be solved in best case 7
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::PENDING { count: 7 }
+    );
+
+    handler.propagate_next_level(&config);
+    handler.count();
+
+    // next propagation directly solves this issue
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::FINISHED { count: 7 }
+    );
+
+    handler.show_details(0);
+}
+
+#[test]
+fn test_candidatehandlertype_super_basic2() {
+    // this is just the basic testing without the propagation
+    let config = ConfigType {
+        colors: 3,
+        columns: 2,
+    };
+
+    let mut handler = CandidateHandlerType::new(&config);
+
+    // default setting -> expected to be solved in best case 7
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::PENDING { count: 17 }
+    );
+
+    handler.propagate_next_level(&config);
+    handler.count();
+    handler.show();
+
+    // next propagation directly solves this issue
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::PARTIALLY_FINISHED { count: 20 }
+    );
+
+    handler.propagate_next_level(&config);
+    handler.count();
+    handler.show();
+
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::PARTIALLY_FINISHED { count: 19 }
+    );
+
+    handler.propagate_next_level(&config);
+    handler.count();
+    handler.show();
+
+    assert_eq!(
+        handler.counter_stored,
+        StrategyCounter::PARTIALLY_FINISHED { count: 19 }
+    );
 }

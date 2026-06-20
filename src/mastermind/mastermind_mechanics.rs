@@ -1,5 +1,6 @@
 /// module for basic functions around handling and grading the guesses
 use rand::Rng;
+use std::fmt;
 // #[macro_use]
 // extern crate fstrings;
 
@@ -48,7 +49,7 @@ impl ResultType {
 }
 impl fmt::Display for ResultType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.positions, self.colors)
+        write!(f, "R{}{}", self.positions, self.colors)
     }
 }
 #[test]
@@ -104,11 +105,10 @@ impl fmt::Display for CodeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let entries_as_string = &self
             .entries
-            .clone()
-            .into_iter()
+            .iter()
             .map(|x| x.to_string())
             .collect::<String>();
-        write!(f, "{}", entries_as_string)
+        write!(f, "C{}", entries_as_string)
     }
 }
 #[test]
@@ -247,7 +247,7 @@ pub fn get_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
 }
 
 use std::error;
-use std::fmt;
+
 ///define custom Error Message
 #[derive(Debug, Clone)]
 pub enum CodeTypeError {

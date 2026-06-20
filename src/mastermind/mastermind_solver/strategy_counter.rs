@@ -1,3 +1,4 @@
+use std::fmt;
 /// enum to calculate the number of entries for a strategy
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub enum StrategyCounter {
@@ -13,12 +14,15 @@ impl StrategyCounter {
     /// Assuming the first shot would create a group for each candidate (incl one that is finished)
     /// and another shot for clearing all the unfinished ones
     pub fn new(n_candidates: usize) -> Self {
-        //
-        if n_candidates == 1 {
-            return Self::FINISHED { count: 1 };
-        }
-        return Self::PENDING {
-            count: 2 * n_candidates as u16 - 1,
+        return match n_candidates {
+            1 => Self::FINISHED { count: 1 },
+            // 2 | 3 => Self::PARTIALLY_FINISHED {
+            //     count: 2 * n_candidates as u16 - 1,
+            // },
+            // otherwise return the best estimate how that could be finished
+            _ => Self::PENDING {
+                count: 2 * n_candidates as u16 - 1,
+            },
         };
     }
 
@@ -55,4 +59,24 @@ impl StrategyCounter {
             Self::FINISHED { count } => count <= count_reference,
         };
     }
+}
+impl fmt::Display for StrategyCounter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match *self {
+            Self::PENDING { count } => format!("PENDING({})", count),
+            Self::PARTIALLY_FINISHED { count } => format!("PARTIAl({})", count),
+            Self::FINISHED { count } => format!("FINISHED({})", count),
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[test]
+fn test_str() {
+    fn make_str() -> String {
+        let a = 2;
+        format!("a={}", a)
+    }
+
+    println!("{}", make_str())
 }
