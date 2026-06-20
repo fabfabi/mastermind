@@ -34,7 +34,7 @@ impl ResultType {
         };
     }
     /// check if the solution was already found
-    pub fn is_done(&self, configuration: &ConfigType) -> bool {
+    pub fn is_finished(&self, configuration: &ConfigType) -> bool {
         configuration.columns == self.positions.into()
     }
 
@@ -209,7 +209,7 @@ impl LineType {
 
     ///was the solution found already?
     pub fn done(&self, configuration: &ConfigType) -> bool {
-        return self.result.is_done(&configuration);
+        return self.result.is_finished(&configuration);
     }
 
     pub fn print(&self) {

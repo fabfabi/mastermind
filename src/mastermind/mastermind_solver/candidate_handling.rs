@@ -9,6 +9,8 @@ use crate::mastermind::mastermind_mechanics::ResultType;
 use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
 use std::collections::HashMap;
+
+use simplelog::*;
 // use std::hash::Hash;
 
 /// enum to handle the connection to the next level.
@@ -130,19 +132,19 @@ impl CandidateResultHashMap {
         );
         match self {
             Self::NEW(hm) => {
-                // println!(
+                // info!(
                 //     "{}{} CandidateResultHashmap::NEW",
                 //     " ".repeat(indentation),
                 //     indentation
                 // );
                 for (k, v) in hm.iter() {
-                    println!("{} {} -> {} codes", head_str, k, v.len());
+                    info!("{} {} -> {} codes", head_str, k, v.len());
                     // same groups will not show the header again
                     head_str = " ".repeat(head_str.len())
                 }
             }
             Self::PROPAGATED(hm) => {
-                println!("{}", head_str,);
+                info!("{}", head_str,);
                 for (k, v) in hm.iter() {
                     v.show_details(indentation + 1);
                     // same groups will not show the header again
@@ -299,7 +301,7 @@ impl CandidateResultType {
 
     /// show a high-level summary
     fn show(&self, indentation: usize) {
-        println!(
+        info!(
             "{}{}: Candidate: '{}' with {} groups",
             " ".repeat(indentation),
             indentation,
@@ -469,8 +471,8 @@ impl CandidateHandlerType {
     }
 
     fn show(&self) {
-        println!("{}", "#".repeat(30),);
-        println!("Candidate Handler count: {}", self.counter_stored);
+        info!("{}", "#".repeat(30),);
+        info!("Candidate Handler count: {}", self.counter_stored);
         self.show_details(0);
     }
     fn show_details(&self, indentation: usize) {
@@ -480,7 +482,7 @@ impl CandidateHandlerType {
         }
     }
 }
-
+/// State machine to handle the execution of a strategy
 enum StrategyExecutionType<'a> {
     GUESS {
         handler_candidate: &'a CandidateHandlerType,
@@ -492,6 +494,9 @@ enum StrategyExecutionType<'a> {
 }
 impl<'a> StrategyExecutionType<'a> {
     pub fn new(candidates: &'a CandidateHandlerType) -> Self {
+        if !candidates.counter_stored.is_finished() {
+            panic!("Need a CandidateHandlerType that is FINISHED.")
+        }
         StrategyExecutionType::GUESS {
             handler_candidate: &candidates,
         }
@@ -562,9 +567,55 @@ impl StrategyHandlerType<'_> {
         }
     }
 
+    /// test function to solve and verify the different expected count estimates
+    pub fn test_solve(&mut self, counter_expectation: Vec<StrategyCounter>) {
+        let count_last = counter_expectation.last().unwrap().clone();
+        for counter in counter_expectation {
+            // default setting -> expected to be solved in best case 7
+            self.handler_candidates.show();
+            assert_eq!(self.handler_candidates.counter_stored, counter);
+
+            self.handler_candidates
+                .propagate_next_level(self.configuration);
+            self.handler_candidates.count();
+        }
+        // check the last one - nothing changes once a Candidatehandler is FINISHED.
+        assert_eq!(self.handler_candidates.counter_stored, count_last);
+
+        assert!(self.handler_candidates.is_finished())
+    }
+
     /// verify the count of the strategy
     pub fn verify(self) {
-        todo!()
+        let candidates_all = get_all_codes(self.configuration);
+
+        let mut count = 0;
+        for solution in candidates_all {
+            debug!("Solving {}", solution);
+            // initiate strategy
+            let mut strategy = StrategyExecutionType::new(&self.handler_candidates);
+            for _ in 0..100 {
+                count += 1;
+                let guess = strategy.get_guess();
+                let result = guess.grade(&solution);
+                if result.is_finished(&self.configuration) {
+                    debug!("guessing {} -> {} FINISHED", guess, result);
+                    break;
+                } else {
+                    debug!("guessing {} -> {}", guess, result);
+                }
+                strategy.enter_result(result);
+            }
+        }
+        info!(
+            "Strategy checked: Expected {} and returned {} guesses",
+            self.handler_candidates.counter_stored.get_count_estimate(),
+            count,
+        );
+        assert_eq!(
+            self.handler_candidates.counter_stored.get_count_estimate(),
+            count
+        );
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -574,6 +625,17 @@ impl StrategyHandlerType<'_> {
 mod test_candidate_handling {
     use super::*;
 
+    /// initiate the logger to have logging for the tests
+    fn logger_initiate(level: Option<LevelFilter>) {
+        let lvl = level.unwrap_or(LevelFilter::Debug);
+        CombinedLogger::init(vec![TermLogger::new(
+            lvl,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        )])
+        .unwrap();
+    }
     #[test]
     fn test_result_handler_basics() {
         let guesses = vec![
@@ -851,7 +913,10 @@ mod test_candidate_handling {
             StrategyCounter::PARTIALLY_FINISHED { count: 20 }, // ATTENTION: THIS DECREASES COUNT!!!
             StrategyCounter::FINISHED { count: 19 },
         ];
-        test_solver(&config, counts);
+        let mut sht = StrategyHandlerType::new(&config);
+        sht.test_solve(counts);
+
+        sht.verify();
     }
     // #[test]
     // fn test_candidatehandlertype_basic_3_steps() {
