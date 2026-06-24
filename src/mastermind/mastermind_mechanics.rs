@@ -87,6 +87,11 @@ impl CodeType {
         return self.eq_vec(other.entries.clone());
     }
 
+    /// equals another CodeType defined as String (E.g. C1234)
+    pub fn eq_str(&self, other: String) -> bool {
+        return String::from(self) == other;
+    }
+
     pub fn print(&self) {
         println!("{:?}", &self.entries)
     }
@@ -100,6 +105,15 @@ impl CodeType {
     pub fn len(&self) -> usize {
         return self.entries.len();
     }
+
+    /// deduce the "done" from the code since this contains the number of columns implicitly
+    /// without the need for the configuration
+    pub fn result_finished(&self) -> ResultType {
+        ResultType {
+            positions: self.len() as u8,
+            colors: 0,
+        }
+    }
 }
 impl fmt::Display for CodeType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -109,6 +123,18 @@ impl fmt::Display for CodeType {
             .map(|x| x.to_string())
             .collect::<String>();
         write!(f, "C{}", entries_as_string)
+    }
+}
+impl From<&CodeType> for String {
+    fn from(code: &CodeType) -> String {
+        // not sure how to make that part work. Via the Display functionalities it does
+        // but when trying to implement it to the string conversion, it does not...
+        // let entries_as_string = code
+        //     .entries
+        //     .iter()
+        //     .map(|x| x.to_string())
+        //     .collect::<String>();
+        return format!("{}", code);
     }
 }
 impl From<CodeType> for String {

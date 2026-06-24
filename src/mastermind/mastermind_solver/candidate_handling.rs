@@ -162,7 +162,7 @@ impl CandidateResultHashMap {
             Self::PROPAGATED(hm) => {
                 for (k, v) in hm.iter() {
                     // info!("{} {} => {}", head_str, k, v.get_candidate().get_guess());
-                    info!("{} => {}", head_str, k);
+                    info!("{} => {} @ {}", head_str, k, v.counter_stored);
                     // info!("{} {}", head_str, v.get_candidate().get_guess());
                     v.show_details(indentation + 1);
                     // same groups will not show the header again
@@ -185,6 +185,8 @@ impl CandidateResultHashMap {
                 // if there is just one candidate left in this group
                 // note: the ResultHandlerType ensures, that the last candidate is also taken
                 if number_of_candidates == 1 {
+                    // TODO -> If the Result is already found (i.e. entered before --> FINISHED(0)).
+                    // but how to detect without borrowing the hashmap?
                     return StrategyCounter::FINISHED { count: 1 };
                 }
 
@@ -210,7 +212,12 @@ impl CandidateResultHashMap {
         return match self {
             // new means the children are not yet counted
             Self::NEW(hm) => {
-                check_finished(hm.keys().len(), StrategyCounter::new(number_of_candidates))
+                let mut key_lengh
+                if hm.keys().len() == 1 {
+
+                } else {
+                    check_finished(hm.keys().len(), StrategyCounter::new(number_of_candidates))
+                }
             }
             Self::PROPAGATED(hm) => {
                 // this is the actual counting logic
@@ -371,8 +378,7 @@ impl CandidateHandlerType {
         // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
         if candidates.len() <= 2 {
             let candidate = candidates[0].clone();
-            let new_candidate_result =
-                CandidateResultType::new(&vec![candidate.clone()], &candidate);
+            let new_candidate_result = CandidateResultType::new(&candidates, &candidate);
             result.add(new_candidate_result);
             return result;
         }
@@ -503,11 +509,15 @@ impl CandidateHandlerType {
     pub fn show(&self) {
         info!("{}", "#".repeat(30),);
         info!("Candidate Handler count: {}", self.counter_stored);
-        self.show_details(0);
-        // for candidate in &self.candidate_list {
-        //     info!("{}", candidate.get_guess());
-        //     candidate.show_details(0);
-        // }
+
+        for candidate in &self.candidate_list {
+            info!(
+                "Next candidate: {} @ {}",
+                candidate.get_guess(),
+                candidate.counter_stored
+            );
+            candidate.show_details(0);
+        }
     }
     fn show_details(&self, indentation: usize) {
         // self.show(indentation);
@@ -913,12 +923,14 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 7 },
-            // StrategyCounter::PARTIALLY_FINISHED { count: 7 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 9 },
+            // StrategyCounter::PARTIALLY_FINISHED { count: 9 },
             StrategyCounter::FINISHED { count: 7 },
         ];
         // test_solver(&config, counts);
         let mut sht = StrategyHandlerType::new(&config);
         sht.test_solve(counts);
+        // sht.solve();
         sht.verify();
     }
 
