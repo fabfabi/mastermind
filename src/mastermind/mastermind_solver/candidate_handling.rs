@@ -9,6 +9,7 @@ use crate::mastermind::mastermind_mechanics::ResultType;
 
 // use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
+use core::num;
 use std::collections::HashMap;
 
 use simplelog::*; // needed for logging
@@ -181,30 +182,23 @@ impl CandidateResultHashMap {
     pub fn count(&mut self, number_of_candidates: usize) -> StrategyCounter {
         // closure to check the finished path
         let check_finished = |hm_keys_length: usize, other_option: StrategyCounter| {
+            // if a finish was detected already
+            if other_option.is_finished() {
+                return other_option;
+            }
             if hm_keys_length == number_of_candidates {
                 // if there is just one candidate left in this group
                 // note: the ResultHandlerType ensures, that the last candidate is also taken
-                if number_of_candidates == 1 {
-                    // TODO -> If the Result is already found (i.e. entered before --> FINISHED(0)).
-                    // but how to detect without borrowing the hashmap?
-                    return StrategyCounter::FINISHED { count: 1 };
+                if hm_keys_length <= 1 {
+                    // note that 0 means that the solution was already found the turn before and
+                    // and there is no more input needed.
+                    return StrategyCounter::FINISHED {
+                        count: hm_keys_length as u16,
+                    };
                 }
-
                 return StrategyCounter::PARTIALLY_FINISHED {
                     count: 2 * number_of_candidates as u16 - 1, // exact number is clear
                 };
-
-                // the configuration is not available here and the difference is only one...
-                // let value: u16 = number_of_candidates as u16;
-                // // check if the solution was found and return the number of steps
-                // return match self.contains(&ResultType::is_done(&self, configuration)) {
-                //     true => StrategyCounter::PartiallyFinished {
-                //         count: 2 * value - 1, // exact number is clear
-                //     },
-                //     _ => StrategyCounter::PartiallyFinished {
-                //         count: 2 * value, // worst case scenario, since the solution is not part of this step
-                //     },
-                // };
             }
             return other_option;
         };
@@ -212,12 +206,19 @@ impl CandidateResultHashMap {
         return match self {
             // new means the children are not yet counted
             Self::NEW(hm) => {
-                let mut key_lengh
-                if hm.keys().len() == 1 {
-
-                } else {
-                    check_finished(hm.keys().len(), StrategyCounter::new(number_of_candidates))
+                let mut num_keys = hm.keys().len();
+                if num_keys == 1 {
+                    // the configuration is not availble to the count mehtod
+                    // --> deduce the number of columns from the code directly
+                    let key = hm.keys().into_iter().next().unwrap();
+                    let code = hm.get(key).unwrap().first().unwrap();
+                    // check if this is a branch for a FINISHED state -> no more input
+                    if key.eq(&ResultType::new(code.len() as u8, 0)) {
+                        // set num_keys to 0 since the solution was already found in the previous step
+                        num_keys = 0;
+                    }
                 }
+                check_finished(num_keys, StrategyCounter::new(number_of_candidates))
             }
             Self::PROPAGATED(hm) => {
                 // this is the actual counting logic
@@ -228,13 +229,23 @@ impl CandidateResultHashMap {
                     .map(|x| x.count().get_count_estimate())
                     .sum::<u16>();
 
+                // only for debugging purposes to see all the details
+                // hm.values().for_each(|x| x.show_details(0));
+
                 // return DONE if all are DONE otherwise unfinished
                 // this is detected by the closure for the return type
                 let get_return_type = |count_total: u16| {
+                    // debug!(
+                    //     "next_finished: {}, # keys {}",
+                    //     hm.values().all(|x| x.is_finished()),
+                    //     hm.keys().len()
+                    // );
                     if hm.values().all(|x| x.is_finished()) {
+                        debug!("returning 'Finished'");
                         return StrategyCounter::FINISHED { count: count_total };
+                    } else {
+                        return StrategyCounter::PENDING { count: count_total };
                     }
-                    StrategyCounter::PENDING { count: count_total }
                 };
 
                 return check_finished(
@@ -313,8 +324,12 @@ impl CandidateResultType {
 
     /// executing the count and update the counter
     pub fn count(&mut self) -> &StrategyCounter {
+        debug!("counting {} --> start", self.candidate);
         self.counter_stored = self.result_hashmap.count(self.number_of_candidates);
-
+        debug!(
+            "counting {}, --> finished: {}",
+            self.candidate, self.counter_stored
+        );
         return &self.counter_stored;
     }
 
@@ -915,7 +930,7 @@ mod test_candidate_handling {
     fn test_candidatehandlertype_basic_1_step() {
         // this is just a super basic test to review the mechanics.
         // this solves after one propagation
-        logger_initiate(None);
+        logger_initiate(Some(LevelFilter::Info));
         let config = ConfigType {
             colors: 2,
             columns: 2,
@@ -923,9 +938,9 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 7 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 9 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 7 },
             // StrategyCounter::PARTIALLY_FINISHED { count: 9 },
-            StrategyCounter::FINISHED { count: 7 },
+            StrategyCounter::FINISHED { count: 8 },
         ];
         // test_solver(&config, counts);
         let mut sht = StrategyHandlerType::new(&config);

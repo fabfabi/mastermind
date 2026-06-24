@@ -12,7 +12,9 @@ impl StrategyCounter {
     /// return the best case how this could be solved
     ///
     /// Assuming the first shot would create a group for each candidate (incl one that is finished)
-    /// and another shot for clearing all the unfinished ones
+    /// and another shot for clearing all the unfinished ones.
+    ///
+    /// Note: The count should only increase since this is the BoB Case.
     pub fn new(n_candidates: usize) -> Self {
         return match n_candidates {
             0 | 1 => Self::FINISHED {
