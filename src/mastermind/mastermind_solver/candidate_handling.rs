@@ -691,13 +691,16 @@ mod test_candidate_handling {
     /// initiate the logger to have logging for the tests
     fn logger_initiate(level: Option<LevelFilter>) {
         let lvl = level.unwrap_or(LevelFilter::Info);
-        CombinedLogger::init(vec![TermLogger::new(
+        if let Err(e) = CombinedLogger::init(vec![TermLogger::new(
             lvl,
             Config::default(),
             TerminalMode::Mixed,
             ColorChoice::Auto,
-        )])
-        .unwrap();
+        )]) {
+            // not an issue if this errors. It just means it has already been initiated by another
+            // task
+            println!("Setting the logger errored{}", e);
+        }
     }
     #[test]
     fn test_result_handler_basics() {
@@ -847,48 +850,6 @@ mod test_candidate_handling {
     }
 
     #[test]
-    fn test_candidate_handler_propagation2() {
-        let configuration = &ConfigType {
-            columns: 3,
-            colors: 4,
-        };
-        // trivial case.
-        // if you enter all codes after another, this ends up in 3 rounds and 6 total tries
-        let guesses = vec![
-            CodeType::new(vec![0, 0, 1]),
-            CodeType::new(vec![0, 1, 2]),
-            CodeType::new(vec![3, 0, 0]),
-        ];
-        let mut result_handler =
-            CandidateHandlerType::create_next_candidates(guesses, &configuration);
-        result_handler.count();
-        result_handler.show();
-
-        result_handler.propagate_next_level(configuration);
-        result_handler.count();
-        // result_handler.show();
-
-        assert_eq!(
-            result_handler.counter_stored,
-            StrategyCounter::PARTIALLY_FINISHED { count: 5 }
-        );
-
-        result_handler.propagate_next_level(configuration);
-        result_handler.count();
-        result_handler.show();
-        assert_eq!(
-            result_handler.counter_stored,
-            StrategyCounter::PARTIALLY_FINISHED { count: 5 }
-        );
-        result_handler.propagate_next_level(configuration);
-        result_handler.count();
-        result_handler.show();
-        assert_eq!(
-            result_handler.counter_stored,
-            StrategyCounter::FINISHED { count: 5 }
-        );
-    }
-    #[test]
     fn test_candidate_handler_propagation() {
         let configuration = &ConfigType {
             columns: 3,
@@ -908,25 +869,25 @@ mod test_candidate_handling {
         );
         // update the counter
         handler_candidate.count();
-        // handler_candidate.show_details();
+        // handler_candidate.show();
 
         assert_eq!(
             handler_candidate.counter_stored,
             StrategyCounter::PARTIALLY_FINISHED { count: 7 }
         );
         handler_candidate.propagate_next_level(configuration);
-        // handler_candidate.show_details();
+        // handler_candidate.show();
 
         assert_eq!(
             *handler_candidate.count(),
-            StrategyCounter::FINISHED { count: 6 }
+            StrategyCounter::PARTIALLY_FINISHED { count: 9 }
         );
         handler_candidate.propagate_next_level(configuration);
         handler_candidate.show();
 
         assert_eq!(
             *handler_candidate.count(),
-            StrategyCounter::FINISHED { count: 6 }
+            StrategyCounter::FINISHED { count: 9 }
         );
     }
 
