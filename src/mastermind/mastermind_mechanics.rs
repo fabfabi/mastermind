@@ -16,6 +16,12 @@ impl ConfigType {
             colors: 0,
         }
     }
+    pub fn finished_result(&self) -> ResultType {
+        ResultType {
+            positions: self.columns as u8,
+            colors: 0,
+        }
+    }
 }
 
 ///Structure to store the result
@@ -233,9 +239,14 @@ pub fn grade(guess: &CodeType, solution: &CodeType) -> ResultType {
 
 /// Random code generator
 pub fn generate_code(configuration: &ConfigType) -> CodeType {
+    use rand::prelude::*;
+
+    // Get an RNG:
+    let mut rng = rand::rng();
+    let nums: Vec<u8> = (0..configuration.colors).collect();
     let mut raw_code = Vec::new();
     for _ in 0..configuration.columns {
-        raw_code.push(rand::rng().random_range(0..configuration.colors));
+        raw_code.push(nums.choose(&mut rng).unwrap().clone());
     }
     CodeType::new(raw_code)
 }

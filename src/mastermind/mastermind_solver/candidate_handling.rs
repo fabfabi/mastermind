@@ -41,12 +41,16 @@ impl CandidateResultHashMap {
                     let mut hashmap_new: HashMap<ResultType, CandidateHandlerType> = HashMap::new();
                     // this is triggering the heavy lifting
                     // this could move to a par_iter...
-                    hashmap.drain().for_each(|(k, v)| {
-                        hashmap_new.insert(
-                            k,
-                            CandidateHandlerType::create_next_candidates(v, &configuration),
-                        );
-                    });
+                    hashmap
+                        .drain()
+                        //exclude paths that are detected as finished. No more input needed.
+                        .filter(|(k, _)| *k != configuration.finished_result())
+                        .for_each(|(k, v)| {
+                            hashmap_new.insert(
+                                k,
+                                CandidateHandlerType::create_next_candidates(v, &configuration),
+                            );
+                        });
 
                     *self = Self::PROPAGATED(hashmap_new)
                 }
@@ -686,7 +690,7 @@ mod test_candidate_handling {
 
     /// initiate the logger to have logging for the tests
     fn logger_initiate(level: Option<LevelFilter>) {
-        let lvl = level.unwrap_or(LevelFilter::Debug);
+        let lvl = level.unwrap_or(LevelFilter::Info);
         CombinedLogger::init(vec![TermLogger::new(
             lvl,
             Config::default(),
@@ -930,7 +934,7 @@ mod test_candidate_handling {
     fn test_candidatehandlertype_basic_1_step() {
         // this is just a super basic test to review the mechanics.
         // this solves after one propagation
-        logger_initiate(Some(LevelFilter::Info));
+        logger_initiate(None);
         let config = ConfigType {
             colors: 2,
             columns: 2,
@@ -938,8 +942,7 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 7 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 7 },
-            // StrategyCounter::PARTIALLY_FINISHED { count: 9 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 8 },
             StrategyCounter::FINISHED { count: 8 },
         ];
         // test_solver(&config, counts);
@@ -961,8 +964,8 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 17 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 20 }, // ATTENTION: THIS DECREASES COUNT!!!
-            StrategyCounter::FINISHED { count: 19 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 21 }, // ATTENTION: THIS DECREASES COUNT!!!
+            StrategyCounter::FINISHED { count: 21 },
         ];
         let mut sht = StrategyHandlerType::new(&config);
         sht.test_solve(counts);
@@ -998,10 +1001,8 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 15 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 17 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
-            StrategyCounter::PARTIALLY_FINISHED { count: 20 },
+            StrategyCounter::PARTIALLY_FINISHED { count: 18 },
+            StrategyCounter::FINISHED { count: 18 },
         ];
         let mut sht = StrategyHandlerType::new(&config);
         sht.test_solve(counts);
