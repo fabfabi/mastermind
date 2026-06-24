@@ -6,12 +6,12 @@ use crate::mastermind::mastermind_mechanics::grade;
 use crate::mastermind::mastermind_mechanics::CodeType;
 use crate::mastermind::mastermind_mechanics::ConfigType;
 use crate::mastermind::mastermind_mechanics::ResultType;
-use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
+
+// use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
 use std::collections::HashMap;
 
-use simplelog::*;
-// use std::hash::Hash;
+use simplelog::*; // needed for logging
 
 /// enum to handle the connection to the next level.
 ///
@@ -35,17 +35,20 @@ impl CandidateResultHashMap {
     pub fn create_next_candidates<'a>(&mut self, configuration: &'a ConfigType) {
         match self {
             Self::NEW(hashmap) => {
-                let mut hashmap_new: HashMap<ResultType, CandidateHandlerType> = HashMap::new();
-                // this is triggering the heavy lifting
-                // this could move to a par_iter...
-                hashmap.drain().for_each(|(k, v)| {
-                    hashmap_new.insert(
-                        k,
-                        CandidateHandlerType::create_next_candidates(v, &configuration),
-                    );
-                });
+                // only update if there are 2 or more candidates. For one candidate, no further input is needed
+                if hashmap.len() > 1 {
+                    let mut hashmap_new: HashMap<ResultType, CandidateHandlerType> = HashMap::new();
+                    // this is triggering the heavy lifting
+                    // this could move to a par_iter...
+                    hashmap.drain().for_each(|(k, v)| {
+                        hashmap_new.insert(
+                            k,
+                            CandidateHandlerType::create_next_candidates(v, &configuration),
+                        );
+                    });
 
-                *self = Self::PROPAGATED(hashmap_new)
+                    *self = Self::PROPAGATED(hashmap_new)
+                }
             }
             Self::PROPAGATED(hashmap) => {
                 hashmap
@@ -86,7 +89,15 @@ impl CandidateResultHashMap {
     /// return the handler of a certain result
     pub fn get_handler(&self, result: &ResultType) -> Option<&CandidateHandlerType> {
         return match self {
-            Self::NEW(..) => panic!("Solution is not yet found, there are more levels"),
+            Self::NEW(hm) => {
+                for (k, v) in hm {
+                    println!("{}", k);
+                    for c in v {
+                        println!("    {}", c)
+                    }
+                }
+                panic!("Solution is not yet found, there are more levels")
+            }
             Self::PROPAGATED(hm) => hm.get(result),
         };
     }
@@ -124,9 +135,9 @@ impl CandidateResultHashMap {
 
     /// show the output
     pub fn show_details(&self, indentation: usize, head: Option<String>) {
-        let mut head_str = format!(
+        let head_str = format!(
             "{}{}: {}",
-            " ".repeat(indentation),
+            " ".repeat(indentation * 3),
             indentation,
             head.unwrap_or("".into())
         );
@@ -138,23 +149,28 @@ impl CandidateResultHashMap {
                 //     indentation
                 // );
                 for (k, v) in hm.iter() {
-                    info!("{} {} -> {} codes", head_str, k, v.len());
-                    // same groups will not show the header again
-                    head_str = " ".repeat(head_str.len())
+                    if v.len() == 1 {
+                        info!("{} => {} -> {} DONE", head_str, k, v.first().unwrap());
+                        // head_str = " ".repeat(head_str.len())
+                    } else {
+                        info!("{} => {} -> {} codes", head_str, k, v.len());
+                        // same groups will not show the header again
+                        // head_str = " ".repeat(head_str.len())
+                    }
                 }
             }
             Self::PROPAGATED(hm) => {
                 for (k, v) in hm.iter() {
+                    // info!("{} {} => {}", head_str, k, v.get_candidate().get_guess());
                     info!("{} => {}", head_str, k);
+                    // info!("{} {}", head_str, v.get_candidate().get_guess());
                     v.show_details(indentation + 1);
                     // same groups will not show the header again
-                    head_str = " ".repeat(head_str.len())
+                    // head_str = " ".repeat(head_str.len())
                 }
             }
         }
     }
-
-    // pub fn show_details(&self, indentation: usize) {}
 
     /// function to count the number of tries of one candidates.
     ///
@@ -266,7 +282,11 @@ impl CandidateResultType {
     /// On purpose this does not contain any logic in order to concentrate
     /// the logic within CandidateResultHashmap::create_next_candidates
     fn propagate_next_level(&mut self, configuration: &ConfigType) {
-        self.result_hashmap.create_next_candidates(&configuration);
+        if let StrategyCounter::FINISHED { .. } = self.counter_stored {
+            // do nothing
+        } else {
+            self.result_hashmap.create_next_candidates(&configuration)
+        }
     }
 
     ///returns if a given result is present in that hashmap
@@ -318,7 +338,7 @@ impl CandidateResultType {
     fn show_details(&self, indentation: usize) {
         // self.show(indentation);
         self.result_hashmap
-            .show_details(indentation, Some(self.tell()));
+            .show_details(indentation, Some(self.candidate.clone().into()));
     }
 
     ///checks if two result_handler are equal (i.e. same results and same number of entries per resulg)
@@ -480,10 +500,14 @@ impl CandidateHandlerType {
         // return self.candidate_list.len() == 1;
     }
 
-    fn show(&self) {
+    pub fn show(&self) {
         info!("{}", "#".repeat(30),);
         info!("Candidate Handler count: {}", self.counter_stored);
         self.show_details(0);
+        // for candidate in &self.candidate_list {
+        //     info!("{}", candidate.get_guess());
+        //     candidate.show_details(0);
+        // }
     }
     fn show_details(&self, indentation: usize) {
         // self.show(indentation);
@@ -863,14 +887,14 @@ mod test_candidate_handling {
         );
         handler_candidate.propagate_next_level(configuration);
         // handler_candidate.show_details();
-        let a = 2;
+
         assert_eq!(
             *handler_candidate.count(),
             StrategyCounter::FINISHED { count: 6 }
         );
         handler_candidate.propagate_next_level(configuration);
-        // handler_candidate.show_details();
-        let a = 2;
+        handler_candidate.show();
+
         assert_eq!(
             *handler_candidate.count(),
             StrategyCounter::FINISHED { count: 6 }
@@ -889,6 +913,7 @@ mod test_candidate_handling {
 
         let counts = vec![
             StrategyCounter::PENDING { count: 7 },
+            // StrategyCounter::PARTIALLY_FINISHED { count: 7 },
             StrategyCounter::FINISHED { count: 7 },
         ];
         // test_solver(&config, counts);

@@ -1,4 +1,6 @@
 mod mastermind;
+
+use mastermind::mastermind_solver::candidate_handling::StrategyHandlerType;
 #[macro_use]
 extern crate fstrings;
 #[macro_use]
@@ -31,4 +33,14 @@ fn main() {
     let mut game = mastermind::new(&configuration);
 
     game.play();
+
+    let config = ConfigType {
+        colors: 2,
+        columns: 2,
+    };
+
+    // test_solver(&config, counts);
+    let mut sht = StrategyHandlerType::new(&config);
+    sht.solve();
+    sht.verify();
 }

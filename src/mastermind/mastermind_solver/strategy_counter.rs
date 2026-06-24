@@ -15,7 +15,9 @@ impl StrategyCounter {
     /// and another shot for clearing all the unfinished ones
     pub fn new(n_candidates: usize) -> Self {
         return match n_candidates {
-            1 => Self::FINISHED { count: 1 },
+            0 | 1 => Self::FINISHED {
+                count: n_candidates as u16,
+            }, // still needs the conversion to "propagated"
             // 2 | 3 => Self::PARTIALLY_FINISHED {
             //     count: 2 * n_candidates as u16 - 1,
             // },

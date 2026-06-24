@@ -111,6 +111,28 @@ impl fmt::Display for CodeType {
         write!(f, "C{}", entries_as_string)
     }
 }
+impl From<CodeType> for String {
+    fn from(code: CodeType) -> String {
+        // not sure how to make that part work. Via the Display functionalities it does
+        // but when trying to implement it to the string conversion, it does not...
+        // let entries_as_string = code
+        //     .entries
+        //     .iter()
+        //     .map(|x| x.to_string())
+        //     .collect::<String>();
+        return format!("{}", code);
+    }
+}
+#[test]
+fn test_code_export() {
+    let code = CodeType::new(vec![1, 2, 3, 4]);
+
+    println!("some {}", code.clone());
+    assert_eq!("C1234", format!("{}", code));
+
+    let code_str: String = code.clone().into();
+    assert_eq!("C1234", code_str);
+}
 #[test]
 fn test_new_code_type_check() {
     let config = ConfigType {
