@@ -15,6 +15,7 @@ pub struct Game<'a> {
 impl<'a> Game<'a> {
     pub fn new(configuration: &'a ConfigType) -> Self {
         let solution = generate_code(&configuration);
+        info!("Starting a new game with {}", configuration);
         debug!("Solution is generated: {}", solution);
         let gameplay = Self {
             guesses: Vec::<LineType>::new(),
@@ -27,9 +28,10 @@ impl<'a> Game<'a> {
     /// get new inputs until the solution was found
     pub fn play(&mut self) {
         loop {
+            info!("Guess the Solution");
             let done = self.guess();
             if done {
-                println!("!!!congratulations!!!");
+                info!("!!!congratulations!!!");
                 break;
             }
             self.show()
@@ -37,6 +39,7 @@ impl<'a> Game<'a> {
     }
     /// show all previous inputs
     fn show(&self) {
+        info!("Previous Input");
         for guess in &self.guesses {
             guess.print()
         }

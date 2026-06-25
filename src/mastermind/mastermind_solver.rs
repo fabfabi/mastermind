@@ -576,7 +576,7 @@ impl CandidateHandlerType {
         };
         // return self.candidate_list.len() == 1;
     }
-
+    /// initiate to show all the details
     pub fn show(&self) {
         info!("{}", "#".repeat(30),);
         info!("Candidate Handler count: {}", self.counter_stored);
@@ -590,6 +590,7 @@ impl CandidateHandlerType {
             candidate.show_details(0);
         }
     }
+    /// Function to be called recursively to show the details
     fn show_details(&self, indentation: usize) {
         // self.show(indentation);
         for candidate in &self.candidate_list {
@@ -667,6 +668,7 @@ pub struct StrategyHandlerType<'a> {
 }
 impl StrategyHandlerType<'_> {
     pub fn new<'a>(config: &'a ConfigType) -> StrategyHandlerType<'a> {
+        info!("Identify the strategy for {}", &config);
         StrategyHandlerType {
             configuration: config,
             handler_candidates: CandidateHandlerType::new(&config),
@@ -680,6 +682,7 @@ impl StrategyHandlerType<'_> {
 
     /// solve to find the best strategy
     pub fn solve(&mut self) {
+        info!("Solving: Brute force to find the best strategy");
         while !self.handler_candidates.counter_stored.is_finished() {
             info!("propagating next level");
             self.handler_candidates
@@ -708,7 +711,7 @@ impl StrategyHandlerType<'_> {
     }
 
     /// verify the count of the strategy
-    pub fn verify(self) {
+    pub fn verify(&self) {
         let candidates_all = self.configuration.get_all_codes().unwrap();
 
         let mut count = 0;
@@ -738,6 +741,12 @@ impl StrategyHandlerType<'_> {
             self.handler_candidates.counter_stored.get_count_estimate(),
             count
         );
+    }
+
+    /// show the entire strategy
+    pub fn show(&self) {
+        info!("Exporting the strategy");
+        self.handler_candidates.show();
     }
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////

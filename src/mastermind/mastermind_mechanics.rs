@@ -73,6 +73,7 @@ impl ConfigType {
             all_codes: CodeOption::New,
         }
     }
+    /// initialize a new ConfigType. The order of the call arguments is inconsistent with ConfigType::new but fits to the entire unittesting. :-(
     pub fn new_extended(colors: u8, columns: usize) -> Self {
         let mut cfg = ConfigType::new(columns, colors);
         cfg.initialize();
@@ -95,6 +96,15 @@ impl ConfigType {
     }
     pub fn get_all_codes(&self) -> Option<&Vec<CodeType>> {
         return self.all_codes.get_all_codes();
+    }
+}
+impl fmt::Display for ConfigType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "configuration: ({} columns {} colors)",
+            self.columns, self.colors
+        )
     }
 }
 
@@ -343,7 +353,7 @@ impl LineType {
     }
 
     pub fn print(&self) {
-        info!("{} {}", &self.code, &self.result)
+        info!("Entered: {} -> {}", &self.code, &self.result)
     }
 }
 
