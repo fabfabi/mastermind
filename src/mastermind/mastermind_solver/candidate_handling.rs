@@ -8,9 +8,9 @@ use crate::mastermind::mastermind_mechanics::ResultType;
 
 // use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
-use std::collections::HashMap;
-
-use simplelog::*; // needed for logging
+use rayon::prelude::*;
+use simplelog::*;
+use std::collections::HashMap; // needed for logging
 
 /// enum to handle the connection to the next level.
 ///
@@ -374,7 +374,7 @@ impl CandidateHandlerType {
 
     fn propagate_next_level(&mut self, configuration: &ConfigType) {
         self.candidate_list
-            .iter_mut()
+            .par_iter_mut()
             .for_each(|x| x.propagate_next_level(&configuration))
     }
     /// check if a similar CandidateResult is already found

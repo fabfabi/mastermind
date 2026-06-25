@@ -31,9 +31,9 @@ fn main() {
 
     // game.play();
     info!("checking strategy");
-    let config = ConfigType::new_extended(4, 3);
+    let config = ConfigType::new_extended(5, 3);
 
-    // 5 colors & 3 columns => ~2 min calculation time and 451 guesses
+    // 5 colors & 3 columns => ~2 min calculation time and 451 guesses // parallel: 20 seconds
     // 4 colors & 3 columns => ~2 seconds calculation time and 206 guesses
 
     // test_solver(&config, counts);
