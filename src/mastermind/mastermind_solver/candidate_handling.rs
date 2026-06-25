@@ -423,11 +423,6 @@ impl CandidateHandlerType {
         return false;
     }
 
-    /// initiate the counting logic that also updates the status
-    fn count_initiate(&mut self) {
-        self.count();
-    }
-
     /// global counting Logic:
     /// 1) count the number of tries and update the Status (calling top-down and finishing bottom up)
     /// 2) cut away the unneccesary branches (top-down)
