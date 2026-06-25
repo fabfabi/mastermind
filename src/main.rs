@@ -29,9 +29,12 @@ fn main() {
     let configuration = ConfigType::new(4, 6);
     let mut game = mastermind::new(&configuration);
 
-    game.play();
+    // game.play();
+    info!("checking strategy");
+    let config = ConfigType::new_extended(4, 3);
 
-    let config = ConfigType::new(2, 2);
+    // 5 colors & 3 columns => ~2 min calculation time and 451 guesses
+    // 4 colors & 3 columns => ~2 seconds calculation time and 206 guesses
 
     // test_solver(&config, counts);
     let mut sht = StrategyHandlerType::new(&config);

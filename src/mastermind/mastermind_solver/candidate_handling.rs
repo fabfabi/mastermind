@@ -120,21 +120,6 @@ impl CandidateResultHashMap {
         }
         return true;
     }
-    // Might be a bit of an overkill to define a generic function to execute closures on a Hashmap
-    // fn exec_closure<T>(self, closure: Box<dyn Fn(HashMap<ResultType, T>) >){
-    //     match self {
-    //         Self::NEW(hm) => closure(hm),
-    //         Self::PROPAGATED(hm) => closure(hm),
-    //     }
-    // }
-
-    fn tell(&self) -> String {
-        match self {
-            Self::NEW(_) => "CandidateResultHashMap::NEW",
-            Self::PROPAGATED(_) => "CandidateResultHashMap::PROPAGATED",
-        }
-        .into()
-    }
 
     /// show the output
     pub fn show_details(&self, indentation: usize, head: Option<String>) {
@@ -146,30 +131,18 @@ impl CandidateResultHashMap {
         );
         match self {
             Self::NEW(hm) => {
-                // info!(
-                //     "{}{} CandidateResultHashmap::NEW",
-                //     " ".repeat(indentation),
-                //     indentation
-                // );
                 for (k, v) in hm.iter() {
                     if v.len() == 1 {
                         info!("{} => {} -> {} DONE", head_str, k, v.first().unwrap());
-                        // head_str = " ".repeat(head_str.len())
                     } else {
                         info!("{} => {} -> {} codes", head_str, k, v.len());
-                        // same groups will not show the header again
-                        // head_str = " ".repeat(head_str.len())
                     }
                 }
             }
             Self::PROPAGATED(hm) => {
                 for (k, v) in hm.iter() {
-                    // info!("{} {} => {}", head_str, k, v.get_candidate().get_guess());
                     info!("{} => {} @ {}", head_str, k, v.counter_stored);
-                    // info!("{} {}", head_str, v.get_candidate().get_guess());
                     v.show_details(indentation + 1);
-                    // same groups will not show the header again
-                    // head_str = " ".repeat(head_str.len())
                 }
             }
         }
@@ -321,14 +294,6 @@ impl CandidateResultType {
             self.candidate, self.counter_stored
         );
         return &self.counter_stored;
-    }
-
-    /// propagate the information of the Hashmap
-    fn tell(&self) -> String {
-        format!(
-            "'{}' '{}', #{}",
-            self.candidate, self.counter_stored, self.number_of_candidates
-        )
     }
 
     /// return the candidate that is entered at this step
