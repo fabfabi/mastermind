@@ -173,7 +173,7 @@ impl CodeType {
     }
 
     pub fn print(&self) {
-        println!("{:?}", &self.entries)
+        info!("{}", &self)
     }
 
     ///grade with respect to another codeTpye
@@ -343,7 +343,7 @@ impl LineType {
     }
 
     pub fn print(&self) {
-        println!("{:?} {:?}", &self.code, &self.result.string())
+        info!("{} {}", &self.code, &self.result)
     }
 }
 
@@ -459,10 +459,4 @@ fn test_all_combinations() {
     for (code, code_target) in all_codes_small.iter().zip(target_codes_small.iter()) {
         assert!(code.clone().eq(code_target));
     }
-
-    /* println!("entries: {}", ac.len());
-    for row in ac{
-        println!("{:?}", row);
-    }
-    assert!(false) */
 }

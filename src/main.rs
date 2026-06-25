@@ -1,6 +1,6 @@
 mod mastermind;
 
-use mastermind::mastermind_solver::candidate_handling::StrategyHandlerType;
+use mastermind::mastermind_solver::StrategyHandlerType;
 #[macro_use]
 extern crate fstrings;
 #[macro_use]
@@ -23,13 +23,13 @@ fn main() {
     )])
     .unwrap();
 
-    println!("Hello, mastermind!");
+    info!("Hello, Mastermind!");
     use self::mastermind::ConfigType;
     use self::mastermind::Game as mastermind;
     let configuration = ConfigType::new(4, 6);
     let mut game = mastermind::new(&configuration);
 
-    // game.play();
+    game.play();
     info!("checking strategy");
     let config = ConfigType::new_extended(5, 3);
 

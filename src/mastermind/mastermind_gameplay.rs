@@ -15,7 +15,7 @@ pub struct Game<'a> {
 impl<'a> Game<'a> {
     pub fn new(configuration: &'a ConfigType) -> Self {
         let solution = generate_code(&configuration);
-        solution.print();
+        debug!("Solution is generated: {}", solution);
         let gameplay = Self {
             guesses: Vec::<LineType>::new(),
             solution: solution,
