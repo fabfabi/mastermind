@@ -899,22 +899,6 @@ mod test_candidate_handling {
 
         sht.verify();
     }
-    // #[test]
-    // fn test_candidatehandlertype_basic_3_steps() {
-    //     // this is just the basic testing without the propagation
-    //     // this solves after two propagations
-    //     let config = ConfigType {
-    //         colors: 3,
-    //         columns: 3,
-    //     };
-
-    //     let counts = vec![
-    //         StrategyCounter::PENDING { count: 31 },
-    //         StrategyCounter::PARTIALLY_FINISHED { count: 43 },
-    //         StrategyCounter::FINISHED { count: 40 },
-    //     ];
-    //     test_solver(&config, counts);
-    // }
 
     #[test]
     fn test_candidatehandlertype_basic_3_steps() {
@@ -936,4 +920,19 @@ mod test_candidate_handling {
 
         sht.verify();
     }
+    // #[test]
+    // fn test_candidatehandlertype_enhanced_test() {
+    //     // this is just the basic testing without the propagation
+    //     // this solves after two propagations
+    //     logger_initiate(None);
+    //     let config = ConfigType {
+    //         colors: 5,
+    //         columns: 3,
+    //     };
+
+    //     let mut sht = StrategyHandlerType::new(&config);
+    //     sht.solve();
+
+    //     sht.verify();
+    // }
 }
