@@ -16,14 +16,14 @@ use std::fmt;
 
 fn main() {
     CombinedLogger::init(vec![TermLogger::new(
-        LevelFilter::Debug,
+        LevelFilter::Info,
         Config::default(),
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )])
     .unwrap();
 
-    println!("Hello, world!");
+    println!("Hello, mastermind!");
     use self::mastermind::ConfigType;
     use self::mastermind::Game as mastermind;
     let configuration = ConfigType {

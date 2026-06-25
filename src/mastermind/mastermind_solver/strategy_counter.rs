@@ -17,7 +17,7 @@ impl StrategyCounter {
     /// Note: The count should only increase since this is the BoB Case.
     pub fn new(n_candidates: usize) -> Self {
         return match n_candidates {
-            0 | 1 => Self::FINISHED {
+            1 => Self::FINISHED {
                 count: n_candidates as u16,
             }, // still needs the conversion to "propagated"
             // 2 | 3 => Self::PARTIALLY_FINISHED {

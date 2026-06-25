@@ -193,7 +193,7 @@ impl CandidateResultHashMap {
             if hm_keys_length == number_of_candidates {
                 // if there is just one candidate left in this group
                 // note: the ResultHandlerType ensures, that the last candidate is also taken
-                if hm_keys_length <= 1 {
+                if hm_keys_length == 1 {
                     // note that 0 means that the solution was already found the turn before and
                     // and there is no more input needed.
                     return StrategyCounter::FINISHED {
@@ -210,19 +210,7 @@ impl CandidateResultHashMap {
         return match self {
             // new means the children are not yet counted
             Self::NEW(hm) => {
-                let mut num_keys = hm.keys().len();
-                if num_keys == 1 {
-                    // the configuration is not availble to the count mehtod
-                    // --> deduce the number of columns from the code directly
-                    let key = hm.keys().into_iter().next().unwrap();
-                    let code = hm.get(key).unwrap().first().unwrap();
-                    // check if this is a branch for a FINISHED state -> no more input
-                    if key.eq(&ResultType::new(code.len() as u8, 0)) {
-                        // set num_keys to 0 since the solution was already found in the previous step
-                        num_keys = 0;
-                    }
-                }
-                check_finished(num_keys, StrategyCounter::new(number_of_candidates))
+                check_finished(hm.keys().len(), StrategyCounter::new(number_of_candidates))
             }
             Self::PROPAGATED(hm) => {
                 // this is the actual counting logic
@@ -378,7 +366,6 @@ impl CandidateResultType {
 struct CandidateHandlerType {
     candidate_list: Vec<CandidateResultType>,
     counter_stored: StrategyCounter,
-    number_of_candidates: u16, // TBD: needed for the counting logic?
 }
 impl CandidateHandlerType {
     /// create a candidate handler for a completely new game
@@ -391,7 +378,6 @@ impl CandidateHandlerType {
         let mut result = CandidateHandlerType {
             candidate_list: Vec::new(),
             counter_stored: StrategyCounter::new(candidates.len()),
-            number_of_candidates: candidates.len() as u16,
         };
         // if there are only a few candidates left, no more grading needed
         // definitely works for 1 and 2, should also work for other small numbers TO BE CHECKED!!!
@@ -419,11 +405,6 @@ impl CandidateHandlerType {
         }
 
         return result;
-    }
-
-    /// return the number of candidates identified for the next input
-    fn number_of_candidates_next_input(&self) -> usize {
-        self.candidate_list.len()
     }
 
     fn propagate_next_level(&mut self, configuration: &ConfigType) {
@@ -837,16 +818,6 @@ mod test_candidate_handling {
         );
         // Note: this could also be considered as PartiallyFinished since one of the paths is finished
         // 10 will calculate a partial finish at 5
-
-        //////////////////////////////////////////
-        //  just a check on the high-level
-        let config64 = ConfigType {
-            colors: 6,
-            columns: 4,
-        };
-        // still needed?
-        let cht = StrategyHandlerType::new(&config64);
-        assert_eq!(cht.handler_candidates.number_of_candidates_next_input(), 5);
     }
 
     #[test]
