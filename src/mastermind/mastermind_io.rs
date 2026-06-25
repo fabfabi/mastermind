@@ -27,10 +27,7 @@ fn read_code(
 
 #[test]
 fn test_read_code() {
-    let config = mm::ConfigType {
-        columns: 4,
-        colors: 6,
-    };
+    let config = mm::ConfigType::new(4, 6);
 
     // test the easy case
     assert!(read_code(Ok("1234".to_string()), &config)

@@ -1,7 +1,6 @@
 /// old code to use as a reference.
 /// The data structure is bad (global hashmap) some aspects might be re-used
 /// Going for a directed graph (one node contains all its children)
-use crate::mastermind::mastermind_mechanics::get_all_codes;
 use crate::mastermind::mastermind_mechanics::grade;
 use crate::mastermind::mastermind_mechanics::CodeType;
 use crate::mastermind::mastermind_mechanics::ConfigType;
@@ -9,7 +8,6 @@ use crate::mastermind::mastermind_mechanics::ResultType;
 
 // use crate::mastermind::mastermind_solver::candidate_handling::StrategyExecutionType::GUESS;
 use crate::mastermind::mastermind_solver::strategy_counter::StrategyCounter;
-use core::num;
 use std::collections::HashMap;
 
 use simplelog::*; // needed for logging
@@ -370,8 +368,11 @@ struct CandidateHandlerType {
 impl CandidateHandlerType {
     /// create a candidate handler for a completely new game
     fn new(configuration: &ConfigType) -> Self {
-        let candidates = get_all_codes(configuration);
-        return CandidateHandlerType::create_next_candidates(candidates, configuration);
+        if let Some(candidates) = configuration.get_all_codes() {
+            return CandidateHandlerType::create_next_candidates(candidates.clone(), configuration);
+        } else {
+            panic!("configuration needs to be initialized")
+        }
     }
     ///creates the next level of candidates. This function triggers the heavy lifting
     fn create_next_candidates(candidates: Vec<CodeType>, configuration: &ConfigType) -> Self {
@@ -387,11 +388,10 @@ impl CandidateHandlerType {
             result.add(new_candidate_result);
             return result;
         }
-        // this one should move to become either a static variable
-        // or some static method from configuration so this is loaded once and then just returned
-        let ALL_CANDIDATES = get_all_codes(configuration);
+        // unwrap should be possible since the new function checks the initialization
+        let candidates_all = configuration.get_all_codes().unwrap();
 
-        for code in ALL_CANDIDATES.iter() {
+        for code in candidates_all.iter() {
             let new_candidate_result = CandidateResultType::new(&candidates, code);
             // no benefit in checking candidate that does not increase information
             if new_candidate_result.num_results() == 1 {
@@ -626,7 +626,7 @@ impl StrategyHandlerType<'_> {
 
     /// verify the count of the strategy
     pub fn verify(self) {
-        let candidates_all = get_all_codes(self.configuration);
+        let candidates_all = self.configuration.get_all_codes().unwrap();
 
         let mut count = 0;
         for solution in candidates_all {
@@ -759,10 +759,7 @@ mod test_candidate_handling {
     #[test]
     fn test_candidatehandlertype_basic() {
         // this is just the basic testing without the propagation
-        let config = ConfigType {
-            colors: 2,
-            columns: 2,
-        };
+        let config = ConfigType::new_extended(2, 2);
         let cht_one =
             CandidateHandlerType::create_next_candidates(vec![CodeType::new(vec![0, 0])], &config);
 
@@ -817,10 +814,7 @@ mod test_candidate_handling {
 
     #[test]
     fn test_candidate_handler_propagation() {
-        let configuration = &ConfigType {
-            columns: 3,
-            colors: 5,
-        };
+        let configuration = &ConfigType::new_extended(5, 3);
         let guesses = vec![
             CodeType::new(vec![1, 1, 1]),
             CodeType::new(vec![2, 2, 2]),
@@ -862,10 +856,7 @@ mod test_candidate_handling {
         // this is just a super basic test to review the mechanics.
         // this solves after one propagation
         logger_initiate(None);
-        let config = ConfigType {
-            colors: 2,
-            columns: 2,
-        };
+        let config = ConfigType::new_extended(2, 2);
 
         let counts = vec![
             StrategyCounter::PENDING { count: 7 },
@@ -884,10 +875,7 @@ mod test_candidate_handling {
         logger_initiate(None);
         // this is just the basic testing without the propagation
         // this solves after two propagations
-        let config = ConfigType {
-            colors: 3,
-            columns: 2,
-        };
+        let config = ConfigType::new_extended(3, 2);
 
         let counts = vec![
             StrategyCounter::PENDING { count: 17 },
@@ -905,10 +893,7 @@ mod test_candidate_handling {
         // this is just the basic testing without the propagation
         // this solves after two propagations
         logger_initiate(None);
-        let config = ConfigType {
-            colors: 2,
-            columns: 3,
-        };
+        let config = ConfigType::new_extended(2, 3);
 
         let counts = vec![
             StrategyCounter::PENDING { count: 15 },

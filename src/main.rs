@@ -26,18 +26,12 @@ fn main() {
     println!("Hello, mastermind!");
     use self::mastermind::ConfigType;
     use self::mastermind::Game as mastermind;
-    let configuration = ConfigType {
-        columns: 4,
-        colors: 6,
-    };
+    let configuration = ConfigType::new(4, 6);
     let mut game = mastermind::new(&configuration);
 
     game.play();
 
-    let config = ConfigType {
-        colors: 2,
-        columns: 2,
-    };
+    let config = ConfigType::new(2, 2);
 
     // test_solver(&config, counts);
     let mut sht = StrategyHandlerType::new(&config);

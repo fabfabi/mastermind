@@ -4,12 +4,83 @@ use std::fmt;
 // #[macro_use]
 // extern crate fstrings;
 
+/// overengeneered enum to allow generating and returning
+/// all codes when first called
+#[derive(Default, Clone)]
+enum CodeOption {
+    #[default]
+    New,
+    Initialized(Vec<CodeType>),
+}
+impl CodeOption {
+    ///swap type if not yet initialized
+    pub fn initialize(&mut self, config: &ConfigType) {
+        if let CodeOption::New = self {
+            *self = CodeOption::Initialized(CodeOption::generate_all_codes(config));
+        }
+    }
+
+    /// return all codes if generated
+    pub fn get_all_codes(&self) -> Option<&Vec<CodeType>> {
+        return match self {
+            Self::New => None,
+            Self::Initialized(codes) => Some(codes),
+        };
+    }
+    ///generation functnio for all codes
+    fn generate_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
+        let columns = configuration.columns;
+        let colors = configuration.colors;
+
+        let initial_line = vec![0u8; columns];
+        let mut line = initial_line.clone();
+        let mut all_possible_lines: Vec<CodeType> = Vec::new();
+        let mut appender = |line: &Vec<u8>| {
+            let mut new_line = line.clone();
+            new_line.reverse();
+            all_possible_lines.push(CodeType { entries: new_line });
+        };
+        appender(&line);
+        loop {
+            for c in line.iter_mut() {
+                if *c == colors - 1 {
+                    *c = 0;
+                } else {
+                    *c += 1;
+                    break;
+                }
+            }
+            if *line == vec![0u8; columns] {
+                return all_possible_lines;
+            }
+            appender(&line)
+        }
+    }
+}
+
 ///Structure to store the configuration, i.e. number of columns an colors
+#[derive(Default, Clone)]
 pub struct ConfigType {
     pub columns: usize,
     pub colors: u8,
+    all_codes: CodeOption,
 }
 impl ConfigType {
+    pub fn new(columns: usize, colors: u8) -> Self {
+        ConfigType {
+            columns: columns,
+            colors: colors,
+            all_codes: CodeOption::New,
+        }
+    }
+    pub fn new_extended(colors: u8, columns: usize) -> Self {
+        let mut cfg = ConfigType::new(columns, colors);
+        cfg.initialize();
+        return cfg;
+    }
+    pub fn initialize(&mut self) {
+        self.all_codes.initialize(&self.clone());
+    }
     pub fn done(&self) -> ResultType {
         ResultType {
             positions: self.columns as u8,
@@ -21,6 +92,9 @@ impl ConfigType {
             positions: self.columns as u8,
             colors: 0,
         }
+    }
+    pub fn get_all_codes(&self) -> Option<&Vec<CodeType>> {
+        return self.all_codes.get_all_codes();
     }
 }
 
@@ -167,10 +241,7 @@ fn test_code_export() {
 }
 #[test]
 fn test_new_code_type_check() {
-    let config = ConfigType {
-        columns: 4,
-        colors: 6,
-    };
+    let config = ConfigType::new(4, 6);
 
     assert_eq!(
         CodeType::new_check(vec![1, 2, 3, 4], &config)
@@ -276,35 +347,6 @@ impl LineType {
     }
 }
 
-pub fn get_all_codes(configuration: &ConfigType) -> Vec<CodeType> {
-    let columns = configuration.columns;
-    let colors = configuration.colors;
-
-    let initial_line = vec![0u8; columns];
-    let mut line = initial_line.clone();
-    let mut all_possible_lines: Vec<CodeType> = Vec::new();
-    let mut appender = |line: &Vec<u8>| {
-        let mut new_line = line.clone();
-        new_line.reverse();
-        all_possible_lines.push(CodeType { entries: new_line });
-    };
-    appender(&line);
-    loop {
-        for c in line.iter_mut() {
-            if *c == colors - 1 {
-                *c = 0;
-            } else {
-                *c += 1;
-                break;
-            }
-        }
-        if *line == vec![0u8; columns] {
-            return all_possible_lines;
-        }
-        appender(&line)
-    }
-}
-
 use std::error;
 
 ///define custom Error Message
@@ -372,10 +414,7 @@ fn test_basics() {
         }
     );
 
-    let configuration = ConfigType {
-        colors: 6,
-        columns: 4,
-    };
+    let configuration = ConfigType::new(4, 6);
 
     //d is not done
     assert!(!d.done(&configuration));
@@ -403,20 +442,14 @@ fn test_wrong_input() {
 
 #[test]
 fn test_all_combinations() {
-    let config = ConfigType {
-        columns: 4,
-        colors: 6,
-    };
+    let mut config = ConfigType::new(4, 6);
 
-    let ac = get_all_codes(&config);
+    let ac = CodeOption::generate_all_codes(&config);
 
     assert_eq!(ac.len(), usize::from(6_u16.pow(4)));
 
-    let config = ConfigType {
-        colors: 2,
-        columns: 2,
-    };
-    let all_codes_small = get_all_codes(&config);
+    let config = ConfigType::new_extended(2, 2);
+    let all_codes_small = config.get_all_codes().unwrap();
     let target_codes_small = vec![
         CodeType::new(vec![0, 0]),
         CodeType::new(vec![0, 1]),
