@@ -21,12 +21,14 @@ use std::fs::File;
 #[derive(Parser)]
 struct Cli {
     job: String,
+    n_columns: Option<usize>,
+    n_colors: Option<u8>,
 }
 impl Cli {
     fn run(&self) {
         match self.job.as_str() {
             "play" => Cli::play(),
-            "solve" => Cli::solve(),
+            "solve" => Cli::solve(self.n_columns, self.n_colors),
             _ => error!("Unknown input {}. Please use 'play' or 'solve'", self.job),
         }
     }
@@ -38,9 +40,9 @@ impl Cli {
         game.play();
     }
 
-    fn solve() {
+    fn solve(n_columns: Option<usize>, n_colors: Option<u8>) {
         use mastermind::mastermind_solver::StrategyHandlerType;
-        let config = ConfigType::new_extended(5, 3);
+        let config = ConfigType::new_extended(n_colors.unwrap_or(5), n_columns.unwrap_or(3));
 
         // 5 colors & 3 columns => ~2 min calculation time and 451 guesses // parallel: 20 seconds
         // 4 colors & 3 columns => ~2 seconds calculation time and 206 guesses
